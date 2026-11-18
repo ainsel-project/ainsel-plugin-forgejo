@@ -132,6 +132,10 @@ jobs:
       - name: Push the chart to GHCR
         env:
           TGZ: ${{ steps.chart.outputs.tgz }}
+          # Not set in a run step's environment by default: without it set -u
+          # stops the login (the v0.1.0 run of ainsel-plugin-forgejo failed here
+          # after the image was already pushed and signed).
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           printf '%s' "${GITHUB_TOKEN}" | helm registry login ghcr.io \

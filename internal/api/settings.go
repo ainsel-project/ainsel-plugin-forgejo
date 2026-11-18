@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -24,10 +25,12 @@ type settingsOps interface {
 }
 
 // passRunner is the reconcile engine as the settings routes use it: one pass
-// over the resources a scope names. A nil rec is a plugin built without a hub
-// client: settings still save, and nothing there is to reconcile.
+// over the resources a scope names, and the on-demand LLM reachability check
+// behind "Check now". A nil rec is a plugin built without a hub client:
+// settings still save, and nothing there is to reconcile.
 type passRunner interface {
 	Pass(ctx context.Context, scope reconcile.Scope) (reconcile.Summary, error)
+	CheckLLMs(ctx context.Context) ([]reconcile.LLMCheck, error)
 }
 
 // settingsResponse is both GET and PUT answer: the full set, edited included.
@@ -221,10 +224,13 @@ func NewSettings(h hub.Client, s settingsOps, rec passRunner) http.Handler {
 		})
 	})
 
-	// POST /api/settings/reconcile — "Check now": one pass over everything,
-	// answered with the per-resource summary. This is where drift shows
-	// itself: the console keeps no drift badge of its own, because a badge
-	// that noticed drift on its own would be a timer by another name.
+	// POST /api/settings/reconcile — "Check now": one drift pass over everything,
+	// answered with the per-resource summary, plus the LLM reachability check over
+	// the pairs the settings name. This is where drift shows itself — and where a
+	// provider that cannot serve shows itself too, because a button named "check"
+	// that never asks the question is how a broken configuration reads as healthy.
+	// The periodic loop stays drift-only: pinging a third-party provider on a timer
+	// is cost and flake the plugin cannot repair away.
 	mux.HandleFunc("POST /api/settings/reconcile", func(w http.ResponseWriter, r *http.Request) {
 		if rec == nil {
 			writeError(w, http.StatusServiceUnavailable, "this plugin has no hub to reconcile against")
@@ -235,6 +241,21 @@ func NewSettings(h hub.Client, s settingsOps, rec passRunner) http.Handler {
 			if err != nil {
 				log.Printf("api: settings: reconcile: %v", err)
 				return err
+			}
+			checks, err := rec.CheckLLMs(ctx)
+			if err != nil {
+				// The reachability half not running fails the whole answer: a summary
+				// that silently omits it would let "nothing to fix" stand for a check
+				// that was never made — the exact misreport this route exists to end.
+				// The drift pass already wrote what it found, so a retry loses nothing.
+				log.Printf("api: settings: reconcile llm check: %v", err)
+				return fmt.Errorf("llm check: %w", err)
+			}
+			sum.LLMChecks = checks
+			if sum.LLMChecks == nil {
+				// One shape for the console: the list is empty when nothing was
+				// flagged, never null.
+				sum.LLMChecks = []reconcile.LLMCheck{}
 			}
 			logPass("check now", sum)
 			writeJSON(w, http.StatusOK, sum)
@@ -279,9 +300,16 @@ func reconcileScopeFor(field string) reconcile.Scope {
 
 // logPass writes a pass's answer to the log as it is answered: the summary is
 // for whoever asked, the log is for whoever asks later — including the refused
-// writes, which are warnings and not halts.
+// writes, which are warnings and not halts. A flagged LLM check is a warning of
+// the same kind: not a write the hub refused, but not a check that passed either.
 func logPass(cause string, sum reconcile.Summary) {
-	if len(sum.Updated) == 0 && len(sum.Refused) == 0 {
+	flagged := 0
+	for _, c := range sum.LLMChecks {
+		if c.State != hub.LLMCheckOK {
+			flagged++
+		}
+	}
+	if len(sum.Updated) == 0 && len(sum.Refused) == 0 && flagged == 0 {
 		log.Printf("reconcile (%s): nothing to fix", cause)
 		return
 	}
@@ -298,6 +326,12 @@ func logPass(cause string, sum reconcile.Summary) {
 			at += "/" + rf.Role
 		}
 		log.Printf("reconcile (%s): WARNING hub refused %s %s.%s: %v", cause, at, rf.Kind, rf.Field, rf.Error)
+	}
+	for _, c := range sum.LLMChecks {
+		if c.State == hub.LLMCheckOK {
+			continue
+		}
+		log.Printf("reconcile (%s): WARNING llm check %s: %s @%s is %s: %s", cause, c.Role, c.Model, c.Provider, c.State, c.Reason)
 	}
 	log.Printf("reconcile (%s): %d updated, %d refused", cause, len(sum.Updated), len(sum.Refused))
 }

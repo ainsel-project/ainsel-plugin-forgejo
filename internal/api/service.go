@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -338,12 +339,36 @@ func (s *WorkService) runs(ctx context.Context, since time.Time, costs bool) ([]
 	// an agent is what says whether it was refining, developing or reviewing (ruling
 	// R18).
 	roles := rolesOf(installs)
+	names := s.agentNames(ctx)
 	for i := range runs {
 		if role, ok := roles[runs[i].Agent]; ok {
 			runs[i].Role = role
 		}
+		// The page shows an agent by the name an admin gave it, not by the hub's id. A
+		// hub that will not list agents leaves the id: cosmetic, never a failed page.
+		runs[i].AgentName = runs[i].Agent
+		if name := names[runs[i].Agent]; name != "" {
+			runs[i].AgentName = name
+		}
 	}
 	return runs, installs, nil
+}
+
+// agentNames maps agent ids to display names, read once per page from the hub's agent
+// list. A refused or failed read answers an empty map.
+func (s *WorkService) agentNames(ctx context.Context) map[string]string {
+	refs, err := s.hub.ListAgents(ctx)
+	if err != nil {
+		log.Printf("api: work: agent names: %v", err)
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(refs))
+	for _, r := range refs {
+		if r.Name != "" {
+			out[r.ID] = r.Name
+		}
+	}
+	return out
 }
 
 // installs reads what the wizard saved. No installs is no rows, not an error. A

@@ -24,7 +24,10 @@ export interface Subject {
 // Run is one AInsel run.
 export interface Run {
   id: string;
+  // agent is the hub's id for the agent; agentName the display name the plugin
+  // resolved for it (the id again when the hub would not name it) — what a page shows.
   agent: string;
+  agentName?: string;
   role: string;
   status: string;
   connector: string;

@@ -754,9 +754,8 @@ function Scroll({ minWidth, children }: { minWidth: number; children: ReactNode 
 }
 
 export function LivePage() {
-  const { api, hub } = usePluginContext();
+  const { api } = usePluginContext();
   const [runs, setRuns] = useState<Run[] | null>(null);
-  const [agentNames, setAgentNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
@@ -768,12 +767,9 @@ export function LivePage() {
     // the rest of an interval.
     if (paused) return;
     let cancelled = false;
-    // Runs come from the plugin's own work route; agent display names come
-    // from the hub, because a run carries the agent's id (ruling C3) and the
-    // id is what identifies, not what a human reads. The two lists are read
-    // apart and joined here: a hub that cannot answer the agent list costs
-    // the board its names, not its numbers, so that read swallows its error
-    // and the ids stay on show.
+    // Runs come from the plugin's own work route, each carrying its agent's id
+    // (ruling C3) — what identifies — and the display name the plugin resolved for
+    // it — what a human reads.
     const load = () => {
       api
         .get("/work", { query: { since: "1d" } })
@@ -786,21 +782,6 @@ export function LivePage() {
         .catch((err) => {
           if (!cancelled) setError(err.message);
         });
-      hub
-        .get("/agents", { query: { pageSize: "200" } })
-        .then((body) => {
-          if (cancelled) return;
-          const items =
-            (body as { items?: { id?: string; displayName?: string }[] } | null)?.items ?? [];
-          const names: Record<string, string> = {};
-          for (const entry of items) {
-            if (entry?.id) names[entry.id] = entry.displayName || entry.id;
-          }
-          setAgentNames(names);
-        })
-        .catch(() => {
-          // Cosmetic: the ids name the agents well enough until the hub answers.
-        });
     };
     load();
     const timer = setInterval(load, REFRESH_MS);
@@ -808,11 +789,15 @@ export function LivePage() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [api, hub, paused]);
+  }, [api, paused]);
 
-  // agentName reads an agent the way a human would: its display name where the
-  // hub has one, the id where it does not (a deleted agent whose runs outlived
-  // it keeps an honest, if unreadable, name).
+  // agentName reads an agent the way a human would: the display name the work API
+  // resolved onto its runs, the id where it could not (a deleted agent whose runs
+  // outlived it keeps an honest, if unreadable, name).
+  const agentNames: Record<string, string> = {};
+  for (const run of runs ?? []) {
+    if (run.agentName) agentNames[run.agent] = run.agentName;
+  }
   const agentName = (id: string) => agentNames[id] ?? id;
 
   if (error !== null) {

@@ -54,10 +54,20 @@ const OP_COLUMNS = [
   { key: "detail", header: "Detail", cell: (row: OpRow) => <span style={{ color: "var(--ink-2)" }}>{row.detail}</span> },
 ];
 
-const TRIGGER_COLUMNS = [
-  { key: "name", header: "Trigger", cell: (trig: Trigger) => <span style={{ fontFamily: MONO_FONT }}>{trig.name}</span> },
-  { key: "agent", header: "Agent", cell: (trig: Trigger) => <span style={{ fontFamily: MONO_FONT }}>{trig.agentRef}</span> },
-];
+// The trigger table's columns. The agent cell shows the agent by name: the plan names it by
+// id (empty for an agent the apply has yet to create), which reads as noise to an admin.
+function triggerColumns(agentLabel: (trig: Trigger) => string) {
+  return [
+    { key: "name", header: "Trigger", cell: (trig: Trigger) => <span style={{ fontFamily: MONO_FONT }}>{trig.name}</span> },
+    { key: "agent", header: "Agent", cell: (trig: Trigger) => <span>{agentLabel(trig)}</span> },
+  ];
+}
+
+// The role a trigger serves, read off its generated name — forgejo-<role>-<what>-<slug>.
+export function triggerRole(name: string): string | null {
+  const match = /^forgejo-(refiner|developer|reviewer)-/.exec(name);
+  return match ? match[1] : null;
+}
 
 // A plan can name the same kind twice (three agents, three images), so the key is the
 // whole row rather than the two fields that repeat.
@@ -77,9 +87,11 @@ interface PreviewProps {
   applying?: boolean;
   onApply: () => void;
   onBack: () => void;
+  // agentLabel names a trigger's agent for the table; absent, the plan's agentRef shows.
+  agentLabel?: (trig: Trigger) => string;
 }
 
-export function Preview({ plan, applying = false, onApply, onBack }: PreviewProps) {
+export function Preview({ plan, applying = false, onApply, onBack, agentLabel }: PreviewProps) {
   const hasBlocking = plan.verdict.blocking.length > 0;
   const total = plan.create.length + plan.change.length + plan.delete.length;
 
@@ -133,7 +145,7 @@ export function Preview({ plan, applying = false, onApply, onBack }: PreviewProp
           <div style={{ overflowX: "auto" }}>
             <RegisterTable
               rows={plan.triggers}
-              columns={TRIGGER_COLUMNS}
+              columns={triggerColumns(agentLabel ?? ((trig: Trigger) => trig.agentRef || "—"))}
               rowKey={(trig: Trigger) => trig.name}
               withRowNumbers={false}
             />

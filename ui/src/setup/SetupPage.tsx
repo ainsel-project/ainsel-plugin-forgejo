@@ -8,14 +8,14 @@ import { Instance } from "./Instance";
 import { Accounts } from "./Accounts";
 import { Roles } from "./Roles";
 import { Rules } from "./Rules";
-import { Preview } from "./Preview";
+import { Preview, triggerRole } from "./Preview";
 import { Connect } from "./Connect";
 import { Done } from "./Done";
 import { WIZARD_STEPS, WizardPanel } from "./Wizard";
 import type { SetupOptions, PlanResponse, ApplyResponse, ApplyReport, Install, RemoveResponse } from "../api";
 
 export function SetupPage() {
-  const { api } = usePluginContext();
+  const { api, hub } = usePluginContext();
 
   // State
   const [currentStep, setCurrentStep] = useState<SetupStep | null>(null);
@@ -31,6 +31,30 @@ export function SetupPage() {
   // keep" only on an edit, and the account step can be passed on empty there.
   const [editing, setEditing] = useState(false);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
+  // Agent display names by id, read from the hub when a plan arrives: the preview names a
+  // trigger's agent the way an admin knows it, not by its hub id.
+  const [agentNames, setAgentNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (plan === null) return;
+    let cancelled = false;
+    hub
+      .get("/agents", { query: { pageSize: "200" } })
+      .then((body) => {
+        if (cancelled) return;
+        const items = (body as { items?: { id?: string; displayName?: string }[] } | null)?.items ?? [];
+        const names: Record<string, string> = {};
+        for (const entry of items) {
+          if (entry?.id && entry.displayName) names[entry.id] = entry.displayName;
+        }
+        setAgentNames(names);
+      })
+      .catch(() => {
+        // Cosmetic: the role's own name stands in until the hub answers.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plan, hub]);
   const [applyResult, setApplyResult] = useState<ApplyResponse | null>(null);
   // The install S7 is watching. Set by apply (a fresh install, whose webhook has never
   // delivered) and by S0's Connect (an install that is still unverified). S7 reads this and
@@ -513,6 +537,14 @@ export function SetupPage() {
         )}
         <Preview
           plan={plan}
+          agentLabel={(trig) => {
+            // An agent that stands is named by the hub; one the apply has yet to create
+            // by the name this walk gives it — typed, or the role's generated default.
+            if (trig.agentRef && agentNames[trig.agentRef]) return agentNames[trig.agentRef];
+            const role = triggerRole(trig.name) as keyof typeof input.roles | null;
+            if (role && input.roles[role]) return input.roles[role].agentName || `forgejo-${role}-${input.slug}`;
+            return trig.agentRef || "—";
+          }}
           applying={applying}
           onApply={handleApply}
           onBack={handleBack}

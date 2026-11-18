@@ -320,7 +320,7 @@ function RunStep({ run, now, last }: { run: Run; now: Date; last: boolean }) {
           <Tag variant={statusTone(run.status)}>{statusLabel(run.status)}</Tag>
         </div>
         <span style={{ fontSize: 12, color: "var(--ink-2)" }}>
-          {run.agent} ·{" "}
+          {run.agentName || run.agent} ·{" "}
           <span title={new Date(run.start).toLocaleString()}>{formatRelative(run.start, now)}</span>
           {" · "}
           {/* A run that has not finished has no duration to report, so it reads as a dash. */}

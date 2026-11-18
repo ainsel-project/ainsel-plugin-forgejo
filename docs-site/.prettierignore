@@ -1,0 +1,3 @@
+# Vendored from AInsel — these files are kept byte-identical to their upstream so
+# they can be diffed against it. Reformatting them would make that comparison noise.
+src/design/*.css

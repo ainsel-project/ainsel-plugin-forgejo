@@ -4,6 +4,8 @@ Shows what AInsel agents did and are doing on Forgejo — repo → issue → PR 
 
 An **install** of this plugin is a complete, fresh trio for one Forgejo organisation: a refiner, a developer and a reviewer, each with its own Forgejo bot account, its own AInsel role image, its own tool grant on its own agent, its own predefined persona and its own model. The install also owns its own connector, forge MCP server and seven triggers: six event triggers and the developer's half-hourly pull-request patrol. The setup wizard creates all of it; nothing is adopted, and nothing that already exists is edited.
 
+Documentation lives in [`docs/`](docs/) and is published at **[ainsel-project.github.io/ainsel-plugin-forgejo](https://ainsel-project.github.io/ainsel-plugin-forgejo/)** — start at [Overview](docs/overview.md) for what the plugin is, or [Quick Start](docs/quickstart.md) to install it.
+
 ## Before you install
 
 - **An existing hand-made trio on the same organisation reacts to the same events.** Your install subscribes to `issues`, `issue_comment`, `pull_request` and `pull_request_review` on the whole organisation, so an issue that mentions a bot wakes the hand-made agent beside the new one. The plugin never edits a resource it did not create, so it will not quiet the old one for you: **disable those triggers or that webhook yourself** before you install.
@@ -14,7 +16,7 @@ An **install** of this plugin is a complete, fresh trio for one Forgejo organisa
 ## Quick start
 
 1. Install the plugin with Helm, with a pinned image digest (see [Installation](#installation)).
-2. Approve the 14 declared permissions, and grant the plugin the group your install will live in (`plugin.groupAccess`, or afterwards in the console under Plugins → Forgejo → Group Access).
+2. Approve the 15 declared permissions, and grant the plugin the group your install will live in (`plugin.groupAccess`, or afterwards in the console under Plugins → Forgejo → Group Access).
 3. Run the setup wizard (admin only): it creates the bots, teams and tokens in Forgejo, then the MCP server, personas, role images, agents, connector, triggers and the organisation's webhook.
 4. When the wizard asks, make Forgejo send one event: open an issue, or comment on one, in any repository of the organisation. The wizard marks the install verified the moment that event arrives — and if you continue first, the background loop marks it verified when the first event lands.
 5. Open an issue and watch the refiner answer.
@@ -141,7 +143,7 @@ For development without a signature, set `plugins.requireSignature: false`.
 
 ## Permissions
 
-The plugin declares 14 permissions to create and manage agents, agent images, personas, connectors, MCP servers and triggers, and to read invocations and observability. Approve them during installation or later via AInsel's permission UI.
+The plugin declares 15 permissions to create and manage agents, agent images, personas, connectors, MCP servers and triggers, to read invocations and observability, and to ask the hub whether a provider and model can serve a request (`llm:check`). Approve them during installation or later via AInsel's permission UI.
 
 ## Configuration
 
@@ -171,13 +173,20 @@ For local testing with `plugins.requireSignature: false`:
 
 Then set `plugins.requireSignature: false` in AInsel's values and reconcile the plugin.
 
+Documentation is `docs/` — markdown, with `docs/_sidebar.md` driving the navigation. The site that publishes it is `docs-site/`: `pnpm install && pnpm dev` there serves the same files at <http://localhost:5174/ainsel-plugin-forgejo/>. See [`docs-site/README.md`](docs-site/README.md).
+
 ## References
+
+The published documentation is built from [`docs/`](docs/) — see [`docs-site/README.md`](docs-site/README.md) for how the site is built and deployed.
 
 - [Plugin Reference](https://github.com/ainsel-project/ainsel/blob/main/docs/plugin-reference.md) — the manifest and hub contract.
 - [Author Guide](https://github.com/ainsel-project/ainsel/blob/main/docs/writing-a-plugin.md) — building a plugin from scratch.
 - [Template](https://github.com/ainsel-project/ainsel-plugin-template) — the starting point for new AInsel plugins.
+- [`docs/overview.md`](docs/overview.md) — what the plugin gives you, and what an install is.
+- [`docs/architecture.md`](docs/architecture.md) — the read path, the write path, and who owns what.
 - [`docs/setup.md`](docs/setup.md) — the wizard, screen by screen.
 - [`docs/work-view.md`](docs/work-view.md) — how runs are matched to issues and pull requests.
+- [`docs/troubleshooting.md`](docs/troubleshooting.md) — when nothing arrives, or a plan is blocked.
 - [`docs/design/2026-10-24-setup-wizard-flow.md`](docs/design/2026-10-24-setup-wizard-flow.md) — the design the wizard implements.
 
 ## Still open

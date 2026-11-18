@@ -12,3 +12,13 @@ ui/dist/*
 # The install store of a local run (`make run`): DATA_DIR defaults to ./data.
 /data
 .subagents/
+
+# Docs site: build inputs and outputs. The config build emits these next to the
+# sources (tsc -b, composite project), so they are artifacts rather than code.
+docs-site/node_modules/
+docs-site/dist/
+docs-site/*.tsbuildinfo
+docs-site/vite.config.js
+docs-site/vite.config.d.ts
+docs-site/vitest.config.js
+docs-site/vitest.config.d.ts

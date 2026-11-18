@@ -1,9 +1,10 @@
 name: CI
 
-# Every gate this plugin ships with, in one job, in the order it pays off:
-# the cheap Go checks first, then the UI, then the chart, then the image build
-# that ties them together. The image is only built, never pushed — publishing
-# is release.yml's job.
+# Every gate this plugin ships with, in the order it pays off: the cheap Go checks
+# first, then the UI, then the chart, then the image build that ties them together.
+# The docs site is checked beside them rather than only by the workflow that publishes
+# it, so a doc that breaks the site fails the pull request instead of the deploy.
+# The image is only built, never pushed — publishing is release.yml's job.
 
 on:
   push:
@@ -75,3 +76,46 @@ jobs:
           context: .
           tags: ghcr.io/ainsel-project/ainsel-plugin-forgejo:ci
           push: false
+
+  # The same checks the deploy workflow repeats before uploading the artifact. They are
+  # repeated on purpose: CI says a pull request is sound, the deploy gate says the thing
+  # actually published is sound, and only the second one can say that about `main`.
+  docs:
+    name: Docs site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      # pnpm before setup-node, so the setup-node cache can find the lockfile.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: docs-site/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm -C docs-site install --frozen-lockfile
+
+      - name: Lint the docs site
+        run: pnpm -C docs-site lint
+
+      # Vendored CSS is excluded by docs-site/.prettierignore, so "formatted" means
+      # "as upstream shipped it" for those files rather than "reformatted by us".
+      - name: Check formatting
+        working-directory: docs-site
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx}" "dev-server/**/*.ts"
+
+      - name: Test the docs site
+        run: pnpm -C docs-site test
+
+      # Not only the typecheck: this is the step that copies `docs/` into `dist/`, so it
+      # is where a doc the build cannot publish would surface.
+      - name: Build the docs site
+        run: pnpm -C docs-site build

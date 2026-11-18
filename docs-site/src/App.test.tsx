@@ -28,6 +28,13 @@ const quickstartMd = [
   '',
   'A Forgejo site-admin token.',
   '',
+  // Half of these docs is instructions for writing the other half, so the syntax appears quoted.
+  'List a page as `- [Quick Start](quickstart.md)` in the sidebar, for example:',
+  '',
+  '```md',
+  '- [Quick Start](quickstart.md)',
+  '```',
+  '',
 ].join('\n')
 
 const setupMd = [
@@ -114,6 +121,23 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Creating the trio' })).toBeInTheDocument()
     expect(scrollIntoView).not.toHaveBeenCalled()
     scrollIntoView.mockRestore()
+  })
+
+  it('rewrites a link in prose and leaves one in code as it was typed', async () => {
+    // Half of these docs is instructions for writing the other half, so the syntax appears
+    // quoted. Rewritten, the example would show a route in place of what the reader is being
+    // told to type.
+    renderDocs('/docs/quickstart')
+    const heading = await screen.findByRole('heading', { name: 'Quick Start' })
+    const article = within(heading.closest('.docs-content-col') as HTMLElement)
+    expect(article.getByRole('link', { name: 'setup wizard' })).toHaveAttribute(
+      'href',
+      '/docs/setup',
+    )
+    expect(
+      article.getAllByText('- [Quick Start](quickstart.md)', { selector: 'code' }),
+    ).toHaveLength(2)
+    expect(article.queryByRole('link', { name: 'Quick Start' })).toBeNull()
   })
 
   it('offers the next doc in the sidebar order below the article', async () => {

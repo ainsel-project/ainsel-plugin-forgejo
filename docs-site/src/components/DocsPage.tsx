@@ -116,6 +116,23 @@ function parseHeadings(md: string): TocEntry[] {
 // The leading `!` is what separates the two — it can only appear immediately
 // before the `[`, so link text ending in "!" is not mistaken for an image.
 function rewriteDocLinks(md: string): string {
+  // Code first: a fence or an inline span in these docs is markdown quoted as an example —
+  // a doc about writing docs is full of `- [Title](slug)` written out as text — and a route
+  // inside the example is the one thing the example is not. So the code is copied through
+  // untouched and only the prose between the spans is rewritten. (docs.test.ts strips these
+  // same two forms before it looks for links; the rewrite has to agree with it.)
+  const code = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g
+  let out = ''
+  let rest = 0
+  for (const quoted of md.matchAll(code)) {
+    out += rewriteReferences(md.slice(rest, quoted.index))
+    out += quoted[0]
+    rest = (quoted.index ?? 0) + quoted[0].length
+  }
+  return out + rewriteReferences(md.slice(rest))
+}
+
+function rewriteReferences(md: string): string {
   return md.replace(
     /(!)?\[([^\]]*)\]\(([^)]+)\)/g,
     (match, bang: string | undefined, text: string, href: string) => {

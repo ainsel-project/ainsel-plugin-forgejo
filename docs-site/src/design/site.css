@@ -1,0 +1,15 @@
+/* Docs-site-only rules: the two things the console supplies from outside the
+   vendored stylesheets, and nothing else. Everything visual comes from
+   ./design, which is AInsel's own design system. */
+
+:root {
+  /* Declared on `.shell` in the console (frontend/src/layout/Layout.css) and
+     read by the title block, which sticks under the console's mobile bar. The
+     published site has no top bar, so the offset is always zero. */
+  --chrome-top: 0px;
+}
+
+/* `.btn` is written for <button>; the same class on a link should not underline. */
+a.btn {
+  text-decoration: none;
+}

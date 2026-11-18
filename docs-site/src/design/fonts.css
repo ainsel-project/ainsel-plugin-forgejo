@@ -1,0 +1,19 @@
+/*
+ * Vendored from AInsel @ 5f8802d8 — frontend/src/design/fonts.css
+ *
+ * The published docs are the console's own design system, copied rather than
+ * imported: this repository builds without AInsel's frontend, so the styles
+ * have to travel with it. Re-copy from
+ * https://github.com/ainsel-project/ainsel when the console's design changes.
+ */
+
+/* Loaded via Google Fonts <link> in index.html. This file declares fallbacks. */
+
+:root {
+  /* UI font — controls, tables, buttons */
+  --ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Headlines & emphasis */
+  --display: 'Inter', system-ui, sans-serif;
+  /* Labels, figures, code, timestamps */
+  --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+}

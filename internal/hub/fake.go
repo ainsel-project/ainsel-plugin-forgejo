@@ -123,6 +123,18 @@ type Fake struct {
 	SeedEvents          []Event
 	PluginGroupsSeed    []string
 
+	// LLMChecks is what CheckLLM answers with, keyed by the (provider, model) pair:
+	// a test scripts each pair's state and reason. A pair with no entry is answered
+	// as a hub that has no route is answered — unknown, never ok — so a test that
+	// wants "reachable" has to say so.
+	LLMChecks map[LLMCheckPair]LLMCheckResult
+	// LLMCheckErr fails every CheckLLM as a call that never completed (the shape a
+	// transport failure has, not a status): the hub that cannot be asked at all.
+	LLMCheckErr error
+	// LLMChecksAsked records each CheckLLM pair in the order it was asked, which is
+	// how a test asserts a pair shared by two roles was pinged once, not twice.
+	LLMChecksAsked []LLMCheckPair
+
 	// ManagedBy records, per resource, the manager the fake stamped at create the way
 	// the hub does: managerStamp for a create that arrived as the plugin — a context
 	// marked WithBackground with no user credential on it — and "user" for one that
@@ -894,4 +906,27 @@ func (f *Fake) PluginGroups(ctx context.Context) ([]string, error) {
 
 	// Empty, not nil, the same as the real client: a plugin with no group access.
 	return append([]string{}, f.PluginGroupsSeed...), nil
+}
+
+// CheckLLM answers from the scripted per-pair results. A pair nobody scripted is
+// answered the way a hub without the route is answered — unknown, never ok — and
+// LLMCheckErr fails every call as one that never completed, the shape of a hub that
+// cannot be asked at all.
+func (f *Fake) CheckLLM(_ context.Context, provider, model string) (LLMCheckResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record("CheckLLM")
+
+	pair := LLMCheckPair{Provider: provider, Model: model}
+	f.LLMChecksAsked = append(f.LLMChecksAsked, pair)
+	if f.LLMCheckErr != nil {
+		return LLMCheckResult{}, f.LLMCheckErr
+	}
+	if res, ok := f.LLMChecks[pair]; ok {
+		return res, nil
+	}
+	return LLMCheckResult{
+		State:  LLMCheckUnknown,
+		Reason: "cannot check: the hub would not answer the check",
+	}, nil
 }

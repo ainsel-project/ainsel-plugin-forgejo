@@ -3284,3 +3284,224 @@ func TestDeletesTolerateGoneResources(t *testing.T) {
 		t.Error("DeleteAgent on a 409: nil error, want the failure")
 	}
 }
+
+// -- llm reachability check ----------------------------------------------------------
+
+func TestCheckLLMAsksTheHubAndReadsOK(t *testing.T) {
+	h := newHubServer(t)
+	h.post(llmCheckPath, http.StatusOK, `{"ok":true}`)
+
+	c := h.client()
+	res, err := c.CheckLLM(WithCredential(context.Background(), "ainselp_user"), "ollama-cloud", "llama3.3")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckOK {
+		t.Errorf("state = %q, want ok — the hub said the pair serves", res.State)
+	}
+
+	calls := h.calls(http.MethodPost, llmCheckPath)
+	if len(calls) != 1 {
+		t.Fatalf("the hub was asked %d times, want once", len(calls))
+	}
+	if got, want := calls[0].Body, `{"provider":"ollama-cloud","model":"llama3.3"}`; got != want {
+		t.Errorf("body = %s, want %s", got, want)
+	}
+	if got, want := calls[0].Auth, "Bearer ainselp_user"; got != want {
+		t.Errorf("auth = %q, want %q", got, want)
+	}
+}
+
+func TestCheckLLMRefusedRouteIsUnknownNeverUnreachable(t *testing.T) {
+	// A hub without the route (404/405) has not answered the question — the pair is
+	// unknown, not broken. The whole point of the check is that a question nobody
+	// answered never reads as health, and never reads as failure either.
+	for _, code := range []int{
+		http.StatusNotFound, http.StatusMethodNotAllowed,
+	} {
+		h := newHubServer(t)
+		h.post(llmCheckPath, code, `{"error":"no such route"}`)
+
+		res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "p", "m")
+		if err != nil {
+			t.Fatalf("CheckLLM(%d): %v", code, err)
+		}
+		if res.State != LLMCheckUnknown {
+			t.Errorf("code %d: state = %q, want unknown", code, res.State)
+		}
+		if res.Reason == "" {
+			t.Errorf("code %d: an unknown answer carries no reason", code)
+		}
+	}
+}
+
+func TestCheckLLMRefusedPermissionTellsTheAdminWhatToApprove(t *testing.T) {
+	// 401/403 mean the route is there and the plugin's credential is not good for it:
+	// the `llm:check` permission is not approved on the Plugin CR. That is still not an
+	// answer about the provider — unknown, never unreachable — but the reason has to be
+	// something an admin can act on, so it names the permission to approve and keeps
+	// the hub's own sentence when the hub has one.
+	for _, tc := range []struct {
+		code int
+		body string
+		want string
+	}{
+		{http.StatusForbidden, `{"error":"plugin lacks permission llm:check"}`, "plugin lacks permission llm:check"},
+		{http.StatusUnauthorized, `{"error":"plugin lacks permission llm:check"}`, "plugin lacks permission llm:check"},
+		{http.StatusForbidden, ``, "permission not approved"},
+		{http.StatusUnauthorized, ``, "permission not approved"},
+	} {
+		h := newHubServer(t)
+		h.post(llmCheckPath, tc.code, tc.body)
+
+		res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "p", "m")
+		if err != nil {
+			t.Fatalf("CheckLLM(%d): %v", tc.code, err)
+		}
+		if res.State != LLMCheckUnknown {
+			t.Errorf("code %d: state = %q, want unknown — a refused check is not a provider that failed", tc.code, res.State)
+		}
+		if !strings.Contains(res.Reason, tc.want) {
+			t.Errorf("code %d: reason = %q, want it to carry %q", tc.code, res.Reason, tc.want)
+		}
+		if !strings.Contains(res.Reason, "llm:check") || !strings.Contains(res.Reason, "approve") {
+			t.Errorf("code %d: reason = %q, want it to name the permission to approve", tc.code, res.Reason)
+		}
+	}
+}
+
+func TestCheckLLMFailureCarriesTheHubsReason(t *testing.T) {
+	// 502/503/504 are the statuses that mean "the hub asked and the pair could not
+	// serve": unreachable, with the hub's own capped sentence — the sanitized text
+	// the transport already read off the failure body, nothing else.
+	h := newHubServer(t)
+	h.post(llmCheckPath, http.StatusBadGateway, `{"error":"provider refused: connection reset"}`)
+
+	res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "spurious", "gone-model")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckUnreachable {
+		t.Errorf("state = %q, want unreachable", res.State)
+	}
+	if res.Reason != "provider refused: connection reset" {
+		t.Errorf("reason = %q, want the hub's sentence", res.Reason)
+	}
+}
+
+func TestCheckLLMHubWithoutWordsStillNamesTheStatus(t *testing.T) {
+	h := newHubServer(t)
+	h.post(llmCheckPath, http.StatusServiceUnavailable, ``)
+
+	res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "p", "m")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckUnreachable {
+		t.Errorf("state = %q, want unreachable", res.State)
+	}
+	if res.Reason != "the hub answered 503" {
+		t.Errorf("reason = %q, want the status named", res.Reason)
+	}
+}
+
+func TestCheckLLMHubSideFailuresAreUnknownNeverUnreachable(t *testing.T) {
+	// A 400 (a body the hub would not accept — contract drift with the route, or a
+	// custom provider the hub cannot probe from a pair), a 422, a 429 (the hub
+	// rate-limiting the plugin) and a hub-side 500 are all the request failing, not
+	// the pair. Reporting them as "this pair cannot serve" would blame the provider
+	// for the hub's own problem — the misreport class this check exists to end,
+	// aimed at the wrong party.
+	for _, code := range []int{
+		http.StatusBadRequest, http.StatusUnprocessableEntity,
+		http.StatusTooManyRequests, http.StatusInternalServerError,
+	} {
+		h := newHubServer(t)
+		h.post(llmCheckPath, code, `{"error":"hub-side trouble"}`)
+
+		res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "p", "m")
+		if err != nil {
+			t.Fatalf("CheckLLM(%d): %v", code, err)
+		}
+		if res.State != LLMCheckUnknown {
+			t.Errorf("code %d: state = %q, want unknown — the hub's own failure is not the provider's", code, res.State)
+		}
+		if res.Reason == "" {
+			t.Errorf("code %d: an unknown answer carries no reason", code)
+		}
+	}
+}
+
+// TestCheckLLMCustomPairIsAskedAndComesBackUnknown is this plugin's custom rule: the
+// client sends the pair like any other — no plugin-side special case — and the hub's
+// 400 ("a custom provider cannot be checked from a provider/model pair") arrives as
+// unknown. The hub stays the authority; a green light here would vouch for an endpoint
+// nothing probed.
+func TestCheckLLMCustomPairIsAskedAndComesBackUnknown(t *testing.T) {
+	h := newHubServer(t)
+	h.post(llmCheckPath, http.StatusBadRequest, `{"error":"custom provider cannot be checked from a provider/model pair"}`)
+
+	res, err := h.client().CheckLLM(WithCredential(context.Background(), "ainselp_user"), "custom", "llama3.3")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckUnknown {
+		t.Errorf("state = %q, want unknown — nothing probed this endpoint", res.State)
+	}
+	if len(h.calls(http.MethodPost, llmCheckPath)) != 1 {
+		t.Errorf("the pair was not asked; the hub, not the client, answers the custom question")
+	}
+}
+
+func TestCheckLLMUnreachableHubIsUnknown(t *testing.T) {
+	// A hub that cannot be reached at all says nothing about the provider: unknown,
+	// never ok and never the provider's fault.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	srv.Close()
+
+	c := NewHTTPClient(NewTransport(srv.URL))
+	res, err := c.CheckLLM(WithCredential(context.Background(), "ainselp_user"), "p", "m")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckUnknown {
+		t.Errorf("state = %q, want unknown — a hub that cannot be asked answers nothing", res.State)
+	}
+}
+
+func TestCheckLLMTimeoutIsUnknownNotHang(t *testing.T) {
+	// A provider that never answers must not hold "Check now" open: past the cap the
+	// pair is unknown — the check could not be completed.
+	h := newHubServer(t)
+	h.route(http.MethodPost, llmCheckPath, func(w http.ResponseWriter, r *http.Request, _ int) {
+		<-r.Context().Done()
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+
+	c := h.client()
+	c.checkTimeout = 20 * time.Millisecond
+	res, err := c.CheckLLM(WithCredential(context.Background(), "ainselp_user"), "slow", "m")
+	if err != nil {
+		t.Fatalf("CheckLLM: %v", err)
+	}
+	if res.State != LLMCheckUnknown {
+		t.Errorf("state = %q, want unknown — the cap expired before the hub answered", res.State)
+	}
+}
+
+func TestCheckLLMCanceledCallerIsAnError(t *testing.T) {
+	// A caller that went away is not an answer about the provider: the call comes
+	// back as the error it is, and the caller stops caring.
+	h := newHubServer(t)
+	h.route(http.MethodPost, llmCheckPath, func(w http.ResponseWriter, r *http.Request, _ int) {
+		<-r.Context().Done()
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := h.client().CheckLLM(WithCredential(ctx, "ainselp_user"), "p", "m")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("CheckLLM = %v, want a context.Canceled error", err)
+	}
+}

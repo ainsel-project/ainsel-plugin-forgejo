@@ -133,8 +133,59 @@ type Client interface {
 	// Events reads the events the hub recorded for one connector since the given moment.
 	Events(ctx context.Context, connectorID string, since time.Time) ([]Event, error)
 
+	// CheckLLM asks the hub whether one (provider, model) pair can serve a request —
+	// the reachability question behind the Settings page's "Check now". Only the hub
+	// can answer it: the provider name resolves to a base URL and a key hub-side, and
+	// the plugin holds neither by design.
+	//
+	// The answer is a state, never a bare error, for anything the hub actually
+	// answered: a hub without this route, or one that will not let the plugin ask,
+	// comes back as LLMCheckUnknown — "cannot check" — never as ok and never as
+	// unreachable, because the question was not answered. The error is reserved for
+	// the call not completing at all (a cancelled context), where the caller is
+	// going away anyway. The Reason that comes back is sanitized: safe to show.
+	//
+	// A custom provider is not special-cased here: the check names a provider and a
+	// model and no URL, so the hub answers that it cannot be checked from a pair —
+	// which the mapping below reports as unknown. The hub stays the authority.
+	CheckLLM(ctx context.Context, provider, model string) (LLMCheckResult, error)
+
 	// PluginGroups returns the group ids the plugin has access to.
 	PluginGroups(ctx context.Context) ([]string, error)
+}
+
+// LLMCheckPair names one provider and model together — the unit the reachability
+// check asks about, and the key a test scripts an answer under. Two roles sharing a
+// pair are one question, not two.
+type LLMCheckPair struct {
+	Provider string
+	Model    string
+}
+
+// LLMCheckState is the answer to "can this provider serve this model?" in the three
+// states the console renders: ok, unreachable (the hub asked and the pair cannot
+// serve), and unknown (the hub would not answer — an old hub without the route, a
+// refused call, a hub that could not be reached). Unknown is never rendered as ok.
+type LLMCheckState string
+
+const (
+	// LLMCheckOK: the hub resolved the provider and the model answered.
+	LLMCheckOK LLMCheckState = "ok"
+	// LLMCheckUnreachable: the hub answered that the pair cannot serve a request.
+	LLMCheckUnreachable LLMCheckState = "unreachable"
+	// LLMCheckUnknown: the question was not answered — the convention every other
+	// read here follows: a check that could not be asked is "cannot check", never
+	// success and never absence.
+	LLMCheckUnknown LLMCheckState = "unknown"
+)
+
+// LLMCheckResult is one answer to the reachability question: the state, and a
+// sanitized reason for anything that is not ok. The reason is the hub's own capped
+// failure sentence with nothing sensitive in it — the hub sanitizes, the plugin only
+// passes through.
+type LLMCheckResult struct {
+	State  LLMCheckState
+	Reason string
 }
 
 // SubjectCache keeps what each event was about, so an event is read from the hub once.

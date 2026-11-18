@@ -308,8 +308,10 @@ export interface FieldError {
 }
 
 // ReconcileSummary is what POST /api/settings/reconcile ("Check now") answers
-// with: one entry per resource the pass fixed, one per write the hub refused.
-// Both lists are always present, empty rather than null.
+// with: one entry per resource the pass fixed, one per write the hub refused,
+// and one per role whose settings name a model — the reachability answer over
+// the distinct (provider, model) pairs. All three lists are always present,
+// empty rather than null: "nothing to fix" is an answer and not an absence.
 export interface ReconcileChange {
   install?: string;
   role?: string;
@@ -330,6 +332,20 @@ export interface ReconcileRefusal {
 export interface ReconcileSummary {
   updated: ReconcileChange[];
   refused: ReconcileRefusal[];
+  llmChecks: ReconcileLLMCheck[];
+}
+
+// ReconcileLLMCheck is one role's LLM pair as the "Check now" reachability check
+// found it: the pair the settings name, and the state the hub reported — "ok",
+// "unreachable" (the hub asked and the pair cannot serve), or "unknown" (the hub
+// would not answer — an old hub, or one that could not be reached). Unknown is
+// rendered as "cannot check", never as health.
+export interface ReconcileLLMCheck {
+  role: string;
+  provider: string;
+  model: string;
+  state: string;
+  reason?: string;
 }
 
 // fetchSettings reads the whole registry: every (role, field) with its

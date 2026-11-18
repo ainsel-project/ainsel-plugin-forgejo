@@ -340,7 +340,11 @@ export function SettingsPage() {
   const [summary, setSummary] = useState<ReconcileSummary | null>(null);
   const [reconcileError, setReconcileError] = useState<string | null>(null);
   const [reconciling, setReconciling] = useState(false);
-  const [checkedAt, setCheckedAt] = useState<{ at: Date; refused: number } | null>(null);
+  const [checkedAt, setCheckedAt] = useState<{
+    at: Date;
+    refused: number;
+    llmFlagged: number;
+  } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -455,9 +459,19 @@ export function SettingsPage() {
     setReconcileError(null);
     try {
       const res = await reconcileSettings(api);
-      const next = { updated: res.updated ?? [], refused: res.refused ?? [] };
+      const next = {
+        updated: res.updated ?? [],
+        refused: res.refused ?? [],
+        // An answer from an older plugin build carries no check list; reading it as
+        // empty is honest — nothing was checked — and one shape keeps the render simple.
+        llmChecks: res.llmChecks ?? [],
+      };
       setSummary(next);
-      setCheckedAt({ at: new Date(), refused: next.refused.length });
+      setCheckedAt({
+        at: new Date(),
+        refused: next.refused.length,
+        llmFlagged: next.llmChecks.filter((c) => c.state !== "ok").length,
+      });
     } catch (err: any) {
       setReconcileError(err.message || "Failed to reconcile.");
     } finally {
@@ -930,11 +944,14 @@ export function SettingsPage() {
   );
 
   // The header's status: only what this page has seen. Before a pass runs from
-  // here there is no status to show, so the tag is left out.
+  // here there is no status to show, so the tag is left out. A flagged LLM check
+  // — unreachable or unknown — is as much "not in sync" as a refused write: the
+  // button's whole promise is that it says so when the configured provider cannot
+  // serve, or could not be asked at all.
   const syncTag = checkedAt && (
-    <Tag variant={checkedAt.refused > 0 ? "warn" : "ok"}>
-      {checkedAt.refused > 0
-        ? `${checkedAt.refused} refused · checked ${clock(checkedAt.at)}`
+    <Tag variant={checkedAt.refused + checkedAt.llmFlagged > 0 ? "warn" : "ok"}>
+      {checkedAt.refused + checkedAt.llmFlagged > 0
+        ? `${checkedAt.refused + checkedAt.llmFlagged} flagged · checked ${clock(checkedAt.at)}`
         : `In sync · checked ${clock(checkedAt.at)}`}
     </Tag>
   );
@@ -964,10 +981,14 @@ export function SettingsPage() {
 
       {reconcileError && <Notice variant="err">{reconcileError}</Notice>}
       {summary && (
-        <Notice variant={summary.refused.length > 0 ? "warn" : "info"}>
+        <Notice
+          variant={summary.refused.length > 0 || summary.llmChecks.some((c) => c.state !== "ok") ? "warn" : "info"}
+        >
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-              {summary.updated.length === 0 && summary.refused.length === 0 ? (
+              {summary.updated.length === 0 &&
+              summary.refused.length === 0 &&
+              summary.llmChecks.every((c) => c.state === "ok") ? (
                 <div>Checked: nothing to fix.</div>
               ) : (
                 <>
@@ -990,6 +1011,24 @@ export function SettingsPage() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {summary.llmChecks.length > 0 && (
+                    <>
+                      {/* The lists above answer "what did the pass fix"; this one
+                          answers a different question, and says so — otherwise its
+                          lines read as more drift entries. */}
+                      <div>
+                        <strong>LLM checks</strong>
+                      </div>
+                      <ul style={{ margin: 0 }}>
+                        {summary.llmChecks.map((c, i) => (
+                          <li key={`${i}`}>
+                            {`${c.role}: ${c.model} @${c.provider} — ${c.state}`}
+                            {c.reason ? `: ${c.reason}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </>
               )}

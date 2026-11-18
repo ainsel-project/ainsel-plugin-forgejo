@@ -903,6 +903,165 @@ describe("SettingsPage (Reconcile now)", () => {
     await screen.findByText("Checked: nothing to fix.");
   });
 
+  it("warns when the LLM check finds a provider that cannot serve", async () => {
+    // The issue's symptom: the button must not say "nothing to fix" when the
+    // configured provider is unreachable — it names the role, the pair and the reason.
+    mockSettingsGet();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/settings/reconcile") {
+        return {
+          updated: [],
+          refused: [],
+          llmChecks: [
+            { role: "refiner", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
+            {
+              role: "developer",
+              provider: "spurious",
+              model: "gone-model",
+              state: "unreachable",
+              reason: "provider refused: connection reset",
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    await renderLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
+
+    const notice = (await screen.findByText(/gone-model @spurious/)).closest(
+      '[data-testid="notice"]',
+    ) as HTMLElement;
+    expect(notice.dataset.variant).toBe("warn");
+    expect(notice.textContent).toContain("developer");
+    expect(notice.textContent).toContain("unreachable");
+    expect(notice.textContent).toContain("provider refused: connection reset");
+    expect(screen.queryByText("Checked: nothing to fix.")).toBeNull();
+  });
+
+  it("warns when the LLM check could not be asked at all", async () => {
+    // "Cannot check" is its own state: an old hub that would not answer must never
+    // read as health.
+    mockSettingsGet();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/settings/reconcile") {
+        return {
+          updated: [],
+          refused: [],
+          llmChecks: [
+            {
+              role: "refiner",
+              provider: "ollama-cloud",
+              model: "llama3.3",
+              state: "unknown",
+              reason: "cannot check: the hub would not answer the check",
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    await renderLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
+
+    const notice = (
+      await screen.findByText(/cannot check: the hub would not answer/)
+    ).closest('[data-testid="notice"]') as HTMLElement;
+    expect(notice.dataset.variant).toBe("warn");
+    expect(notice.textContent).toContain("unknown");
+    expect(screen.queryByText("Checked: nothing to fix.")).toBeNull();
+  });
+
+  it("still says nothing to fix when every check passed", async () => {
+    // Reachable providers are clean: ok lines are not flags, and a fully clean
+    // summary — drift-free and all-ok — still reads as the confirmation it is.
+    mockSettingsGet();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/settings/reconcile") {
+        return {
+          updated: [],
+          refused: [],
+          llmChecks: [
+            { role: "refiner", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
+            { role: "developer", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
+          ],
+        };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    await renderLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
+
+    await screen.findByText("Checked: nothing to fix.");
+  });
+
+  it("shows the drift answer and the LLM answer together", async () => {
+    mockSettingsGet();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/settings/reconcile") {
+        return {
+          updated: [
+            {
+              install: "apps",
+              role: "reviewer",
+              kind: "agent",
+              field: "llm",
+              from: "old @elsewhere",
+              to: "llama3.3 @ollama-cloud",
+            },
+          ],
+          refused: [],
+          llmChecks: [
+            { role: "reviewer", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
+          ],
+        };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    await renderLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
+
+    const notice = (await screen.findByText(/Reconciled: 1 updated, 0 refused/)).closest(
+      '[data-testid="notice"]',
+    ) as HTMLElement;
+    expect(notice.textContent).toContain("apps/reviewer: agent.llm");
+    expect(notice.textContent).toContain("reviewer: llama3.3 @ollama-cloud — ok");
+  });
+
+  it("counts a flagged LLM check in the header's checked tag", async () => {
+    // "In sync" must not stand for a page whose provider cannot serve: the flagged
+    // count carries the non-ok checks too.
+    mockSettingsGet();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/settings/reconcile") {
+        return {
+          updated: [],
+          refused: [],
+          llmChecks: [
+            {
+              role: "refiner",
+              provider: "spurious",
+              model: "gone-model",
+              state: "unreachable",
+              reason: "no route",
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    await renderLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
+
+    await screen.findByText(/^1 flagged · checked /);
+    expect(screen.queryByText(/In sync · checked/)).toBeNull();
+  });
+
   it("shows when the installs were last seen in sync, only once a pass has run here", async () => {
     mockSettingsGet();
     post.mockImplementation(async () => ({ updated: [], refused: [] }));

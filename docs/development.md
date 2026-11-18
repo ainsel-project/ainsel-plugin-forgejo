@@ -133,6 +133,20 @@ repository, which is why the base path is `/ainsel-plugin-forgejo/` (override wi
 request goes to the path the browser asked for, and no `_redirects` file can be served by a
 workflow-built Pages site.
 
+Two things about that publish step are worth knowing before the first deploy:
+
+- **Pages has to be told to deploy from Actions, once, per repository** — Settings → Pages →
+  Build source → GitHub Actions. With the default source the workflow runs, succeeds, and
+  nothing appears at the URL, because the default source expects a `gh-pages` branch and is not
+  listening to the upload. This is a repository setting, so no workflow can set it.
+- **CI checks the site too**, in the `Docs site` job of `.github/workflows/ci.yml`: lint, format,
+  the content tests, and a build. The deploy workflow repeats them because repeating them is
+  what keeps a broken site from being published from `main`.
+
+The design system's fonts load from Google Fonts at runtime: a reader with no route to them
+gets the fallback stack, which is legible but is not this design. Everything else is in the
+bundle, so the site works offline once opened.
+
 ## Making a change
 
 Work on a branch from the current `origin/main`, one purpose per branch, and open a pull

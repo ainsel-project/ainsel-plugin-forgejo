@@ -6,7 +6,12 @@
     "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Composite projects emit. Left alone, that lands `vite.config.js` and friends next to
+    // the sources — where the linter, the formatter and `git status` all have to be told to
+    // ignore them. They go under node_modules instead.
+    "outDir": "node_modules/.tmp/tsconfig.node",
+    "tsBuildInfoFile": "node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["vite.config.ts", "vitest.config.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "dev-server"]
 }

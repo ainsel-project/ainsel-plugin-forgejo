@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { servedDocsPath } from './dev-server/docsPath'
 
 // GitHub Pages serves a project site from a subpath named after the repository:
 // https://ainsel-project.github.io/ainsel-plugin-forgejo/. The Vite base path
@@ -24,18 +25,19 @@ function repoDocsPlugin(base: string): Plugin {
   const docsDir = path.resolve(process.cwd(), '../docs')
   const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const prefix = new RegExp(`^${escaped}docs/(.+)$`)
-  const isUnpublished = (rel: string) => UNPUBLISHED.includes(rel.split('/')[0])
 
   return {
     name: 'ainsel-plugin-forgejo-docs-site-repo-docs',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = req.url || ''
-        const m = url.match(prefix)
+        const m = (req.url || '').match(prefix)
         if (!m) return next()
-        const rel = decodeURIComponent(m[1].split('?')[0])
-        const filePath = path.join(docsDir, rel)
-        if (!filePath.startsWith(docsDir) || isUnpublished(rel)) return next()
+        const filePath = servedDocsPath(
+          docsDir,
+          decodeURIComponent(m[1].split('?')[0]),
+          UNPUBLISHED,
+        )
+        if (!filePath) return next()
         fs.readFile(filePath, (err, data) => {
           if (err) return next()
           res.setHeader('Content-Type', 'text/markdown; charset=utf-8')

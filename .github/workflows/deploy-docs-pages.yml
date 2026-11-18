@@ -49,7 +49,7 @@ jobs:
 
       - name: Check formatting
         working-directory: docs-site
-        run: pnpm exec prettier --check "src/**/*.{ts,tsx}"
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx}" "dev-server/**/*.ts"
 
       # Reads the real docs/ too: an unlisted page or a dead link fails here
       # rather than in the published site.

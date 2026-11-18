@@ -78,6 +78,10 @@ type HTTPClient struct {
 	// instead of waiting for it.
 	now func() time.Time
 
+	// checkTimeout caps one CheckLLM call. NewHTTPClient sets it to llmCheckTimeout;
+	// it is a field so a test can shorten the cap instead of waiting out ten seconds.
+	checkTimeout time.Duration
+
 	// mu guards the cached background credential, which any goroutine in the plugin
 	// may need at any time. It is held across the mint so two goroutines that start
 	// out with no token do not both go minting one.
@@ -94,7 +98,7 @@ func NewHTTPClient(t *Transport) *HTTPClient {
 	if t == nil {
 		return nil
 	}
-	return &HTTPClient{transport: t, now: time.Now}
+	return &HTTPClient{transport: t, now: time.Now, checkTimeout: llmCheckTimeout}
 }
 
 // get reads one path as the caller of ctx, post writes one and put replaces one. All
@@ -969,6 +973,133 @@ func (c *HTTPClient) PluginGroups(ctx context.Context) ([]string, error) {
 		out = append(out, g.ID)
 	}
 	return out, nil
+}
+
+// -- llm reachability ---------------------------------------------------------------
+
+// llmCheckPath is the hub's "can this provider serve this model?" endpoint: a POST
+// of {provider, model} that answers 200 when the provider resolves and the model can
+// serve, and a status plus a sanitized failure sentence otherwise. The route is a hub
+// addition: a hub without it answers 404, which is "cannot check" here, never ok.
+const llmCheckPath = "/api/v1/llm/check"
+
+// llmCheckTimeout caps one pair's check. The question goes out to a third-party LLM
+// provider that may be down or slow, and "Check now" owes the browser an answer: a
+// pair that has not replied by the cap is reported as unknown — the check could not
+// be completed — rather than holding the whole request open.
+const llmCheckTimeout = 10 * time.Second
+
+// CheckLLM asks the hub whether one (provider, model) pair can serve. The mapping
+// from the hub's answer to the three states:
+//
+//   - 2xx → ok: the hub asked, and the pair answered.
+//   - 502/503/504 → unreachable, carrying the hub's own capped failure sentence:
+//     these are the statuses that mean "the hub asked, the pair could not serve".
+//   - 401/403 → unknown, with a reason that reads as an instruction: the route is there
+//     but the hub will not accept the plugin's credential for it, which in practice
+//     means the manifest's `llm:check` is not approved on the Plugin CR. The question
+//     was still never asked, so the pair is not down — but an admin has to be told
+//     what to approve, not shown a status code.
+//   - any other status → unknown: the request failed, not the pair. A route that is
+//     not there (404/405), a body the hub would not accept (400 — e.g. a custom
+//     provider, which cannot be checked from a pair), the hub rate-limiting the
+//     plugin (429), or a hub-side fault (500) all say nothing about whether the
+//     provider can serve, and must not be reported as if they did.
+//   - no answer at all (transport failure, the cap expiring) → unknown: a hub that
+//     cannot be asked says nothing about the provider.
+//
+// Only a cancelled context comes back as an error: the caller is going away, and
+// there is no answer to report.
+func (c *HTTPClient) CheckLLM(ctx context.Context, provider, model string) (LLMCheckResult, error) {
+	limit := c.checkTimeout
+	if limit == 0 {
+		limit = llmCheckTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
+
+	body := struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+	}{Provider: provider, Model: model}
+
+	// No body is decoded on success: the status is the whole answer. On failure the
+	// transport has already read the hub's body into the StatusError, capped — the
+	// hub's sanitized sentence lives in its "error" field, nothing more.
+	err := c.post(ctx, llmCheckPath, body, nil)
+	if err == nil {
+		return LLMCheckResult{State: LLMCheckOK}, nil
+	}
+	if errors.Is(err, context.Canceled) {
+		return LLMCheckResult{}, err
+	}
+
+	var se *StatusError
+	if errors.As(err, &se) {
+		switch se.Code {
+		case http.StatusBadGateway, http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout:
+			// The hub answered the question on the provider's behalf: the pair
+			// cannot serve. Carry the hub's capped sentence — nothing else.
+			reason := hubFailureMessage(se.Body)
+			if reason == "" {
+				reason = fmt.Sprintf("the hub answered %d", se.Code)
+			}
+			return LLMCheckResult{State: LLMCheckUnreachable, Reason: reason}, nil
+		case http.StatusUnauthorized, http.StatusForbidden:
+			// The route exists; the hub will not let this plugin's credential through it.
+			// For a route the manifest declares, the only thing that produces this is an
+			// unapproved permission — and the hub can only ever approve names the
+			// manifest declared, so the actionable answer names the permission to
+			// approve. Still unknown, never unreachable: a refused question is not a
+			// provider that failed one, and the settings summary prints this sentence
+			// to an admin.
+			detail := hubFailureMessage(se.Body)
+			if detail == "" {
+				detail = "permission not approved"
+			}
+			return LLMCheckResult{
+				State: LLMCheckUnknown,
+				Reason: fmt.Sprintf(
+					"cannot check: the hub refused the check (%s) — approve the llm:check permission for this plugin in the AInsel console",
+					detail),
+			}, nil
+		default:
+			// The request failed, not the pair: no route, a body the hub would not
+			// accept, the hub rate-limiting the plugin, or a hub-side fault. None of
+			// these is evidence about the provider, so none may read as unreachable —
+			// the question was never answered.
+			return LLMCheckResult{
+				State:  LLMCheckUnknown,
+				Reason: fmt.Sprintf("cannot check: the hub would not answer the check (%d)", se.Code),
+			}, nil
+		}
+	}
+
+	// The hub itself did not answer — unreachable, or the cap expired on the way
+	// there. Either way the question was not asked, and the provider's state is
+	// unknown, not bad.
+	return LLMCheckResult{
+		State:  LLMCheckUnknown,
+		Reason: "cannot check: the hub did not answer",
+	}, nil
+}
+
+// hubFailureMessage reads the hub's own explanation off a failure body: its "error"
+// field when the body is the JSON the hub promises, the whole (already capped) body
+// when it is not — a proxy's HTML page is still the only explanation there is. The
+// text is the hub's, sanitized and capped hub-side; this only extracts it.
+func hubFailureMessage(body string) string {
+	if body == "" {
+		return ""
+	}
+	var parsed struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &parsed); err == nil && parsed.Error != "" {
+		return parsed.Error
+	}
+	return body
 }
 
 // -- runs ---------------------------------------------------------------------------

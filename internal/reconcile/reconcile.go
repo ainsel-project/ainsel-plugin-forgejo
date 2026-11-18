@@ -77,18 +77,31 @@ type Refusal struct {
 	Error   string `json:"error"`
 }
 
-// Summary is what a pass answers with: what it updated and what the hub
-// refused, per resource. "Check now" hands it to the console; the log carries
-// the same lines as they happen.
+// Summary is what a pass answers with: what it updated, what the hub refused, and —
+// on the on-demand check — what each role's LLM pair was found to be. "Check now"
+// hands it to the console; the log carries the same lines as they happen.
+//
+// The drift pass (Pass, and with it the periodic loop) leaves LLMChecks empty:
+// asking a third-party provider whether it can serve is the on-demand question
+// "Check now" asks, not something a ten-minute loop should be pinged for. The two
+// lists mean different things and the console renders each on its own: refused is
+// "the hub would not take a write", llmChecks is "the configured provider could not
+// answer, or could not be asked".
 type Summary struct {
 	Updated []Change  `json:"updated"`
 	Refused []Refusal `json:"refused"`
+
+	// LLMChecks is the reachability half: one entry per role whose settings name a
+	// model, answered from one check per distinct (provider, model) pair. It is
+	// always present — empty rather than null — because "nothing was flagged" is an
+	// answer and not an absence.
+	LLMChecks []LLMCheck `json:"llmChecks"`
 }
 
 // newSummary is the empty answer with its lists already there: a pass that
 // wrote nothing answers with [], not null, so the console reads one shape.
 func newSummary() *Summary {
-	return &Summary{Updated: []Change{}, Refused: []Refusal{}}
+	return &Summary{Updated: []Change{}, Refused: []Refusal{}, LLMChecks: []LLMCheck{}}
 }
 
 func (s *Summary) updated(c Change) { s.Updated = append(s.Updated, c) }

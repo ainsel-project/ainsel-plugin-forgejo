@@ -325,6 +325,7 @@ func TestShippedManifestIsValid(t *testing.T) {
 		"connectors:write",
 		"triggers:read",
 		"triggers:write",
+		"llm:check",
 		"mcp-servers:read",
 		"mcp-servers:write",
 	}

@@ -268,15 +268,23 @@ func TestSettingsPUTRejectsAnEmptyBody(t *testing.T) {
 // recordingPass is the reconcile engine as a settings-route test drives it: it
 // remembers the scope of every pass it was asked to run and answers with what
 // the test hands it — including a failure, which a settings save must survive.
+// CheckLLMs answers the same way: the "Check now" route runs it after the pass,
+// so the stub carries its own scripted checks and failure.
 type recordingPass struct {
-	scopes []reconcile.Scope
-	sum    reconcile.Summary
-	err    error
+	scopes   []reconcile.Scope
+	sum      reconcile.Summary
+	err      error
+	checks   []reconcile.LLMCheck
+	checkErr error
 }
 
 func (r *recordingPass) Pass(ctx context.Context, scope reconcile.Scope) (reconcile.Summary, error) {
 	r.scopes = append(r.scopes, scope)
 	return r.sum, r.err
+}
+
+func (r *recordingPass) CheckLLMs(ctx context.Context) ([]reconcile.LLMCheck, error) {
+	return r.checks, r.checkErr
 }
 
 // newSettingsAPIWithPass serves the settings routes over a real settings store
@@ -504,8 +512,9 @@ func TestSettingsCheckNowRunsAFullPass(t *testing.T) {
 		t.Fatalf("scopes: got %v, want one ScopeAll", r.scopes)
 	}
 	var out struct {
-		Updated []reconcile.Change  `json:"updated"`
-		Refused []reconcile.Refusal `json:"refused"`
+		Updated   []reconcile.Change    `json:"updated"`
+		Refused   []reconcile.Refusal   `json:"refused"`
+		LLMChecks *[]reconcile.LLMCheck `json:"llmChecks"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v\nbody: %s", err, w.Body)
@@ -515,6 +524,73 @@ func TestSettingsCheckNowRunsAFullPass(t *testing.T) {
 	}
 	if len(out.Refused) != 1 || out.Refused[0].Kind != "mcpServer" {
 		t.Errorf("refused: %+v", out.Refused)
+	}
+	// The check list rides along even when nothing was checked: the console
+	// reads one shape, [] rather than null.
+	if out.LLMChecks == nil {
+		t.Errorf("llmChecks: null, want [] (body %s)", w.Body)
+	} else if len(*out.LLMChecks) != 0 {
+		t.Errorf("llmChecks: %+v, want empty", *out.LLMChecks)
+	}
+}
+
+// TestSettingsCheckNowCarriesLLMChecks: the reachability half answers beside the
+// drift half. A clean pass over settings that name a provider which cannot serve
+// must not read as "nothing to fix": updated/refused keep their meaning, and the
+// failing pair arrives in llmChecks with its state and reason.
+func TestSettingsCheckNowCarriesLLMChecks(t *testing.T) {
+	rec := &recordingPass{checks: []reconcile.LLMCheck{
+		{Role: "refiner", Provider: "ollama-cloud", Model: "llama3.3", State: hub.LLMCheckUnreachable, Reason: "provider refused the request"},
+		{Role: "developer", Provider: "ollama-cloud", Model: "llama3.3", State: hub.LLMCheckUnreachable, Reason: "provider refused the request"},
+		{Role: "reviewer", Provider: "ollama-cloud", Model: "llama3.3", State: hub.LLMCheckOK},
+	}}
+	api, _ := newSettingsAPIWithPass(t, rec)
+
+	req := settingsRequest(t, http.MethodPost, "")
+	req.URL.Path = "/api/settings/reconcile"
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", w.Code, w.Body)
+	}
+	var out struct {
+		Updated   []reconcile.Change   `json:"updated"`
+		Refused   []reconcile.Refusal  `json:"refused"`
+		LLMChecks []reconcile.LLMCheck `json:"llmChecks"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v\nbody: %s", err, w.Body)
+	}
+	if len(out.Updated) != 0 || len(out.Refused) != 0 {
+		t.Errorf("drift lists changed: updated %+v, refused %+v", out.Updated, out.Refused)
+	}
+	if len(out.LLMChecks) != 3 {
+		t.Fatalf("llmChecks: %+v, want one per role", out.LLMChecks)
+	}
+	if out.LLMChecks[0].State != hub.LLMCheckUnreachable || out.LLMChecks[0].Reason != "provider refused the request" {
+		t.Errorf("failing pair: %+v", out.LLMChecks[0])
+	}
+	if out.LLMChecks[2].State != hub.LLMCheckOK {
+		t.Errorf("ok pair: %+v", out.LLMChecks[2])
+	}
+}
+
+// TestSettingsCheckNowFailsWhenTheCheckCannotRun: a summary that silently
+// omitted the reachability half would let "nothing to fix" stand for a check
+// that was never made — the exact misreport the route exists to end. So a
+// CheckLLMs that cannot run fails the answer rather than riding along as empty.
+func TestSettingsCheckNowFailsWhenTheCheckCannotRun(t *testing.T) {
+	rec := &recordingPass{checkErr: errors.New("settings unreadable")}
+	api, _ := newSettingsAPIWithPass(t, rec)
+
+	req := settingsRequest(t, http.MethodPost, "")
+	req.URL.Path = "/api/settings/reconcile"
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	if w.Code == http.StatusOK {
+		t.Fatalf("status = 200, want a failure (body %s)", w.Body)
 	}
 }
 

@@ -429,6 +429,36 @@ survives upgrades; an untouched one follows the shipped default. **Reset**
 re-adopts the default, and a dirty field older than the running plugin shows what
 the new version ships before you decide.
 
+### Check now
+
+The **Check now** button in the page header answers two questions in one click.
+The first is drift: one reconcile pass over every install compares the agents,
+personas and MCP row against these settings and writes back what moved — the
+answer lists what it fixed and what the hub refused, exactly as the periodic pass
+logs it.
+
+The second is reachability: a pass only compares strings, so a provider name that
+resolves to nothing reads as "correct" to it. After the pass, the plugin asks the
+hub — once per distinct (provider, model) pair the roles name, not once per role —
+whether that pair can actually serve a request. Only the hub can ask: the provider
+name resolves to a base URL and a key hub-side, and the plugin holds neither; the
+question carries the two strings and no secret. Each answer arrives in one of three
+states, reported per role beside the pair it is about:
+
+| State | Meaning |
+|---|---|
+| `ok` | the hub resolved the provider and the model answered. |
+| `unreachable` | the hub asked and the pair could not serve — the hub's own failure sentence rides along. |
+| `unknown` | the question was not answered — an old hub without the check route, a refused call (the answer names the `llm:check` permission to approve), or a `custom` pair, which the hub cannot probe from a provider/model name alone. Never rendered as health. |
+
+"Checked: nothing to fix." appears only when the pass is clean **and** every check
+came back ok; a flagged check warns like a refused write does, and the header's
+checked tag counts flags. A flagged check is a diagnostic, not drift: it never
+becomes a refusal and never blocks anything — and saving a field is never gated on
+reachability, because a provider that is down right now does not make the name the
+role names wrong. The reachability question is asked only when you press the
+button: the periodic pass never pings a provider on a timer.
+
 ### Forgejo instances
 
 The same page carries a second, smaller collection: the Forgejo addresses an

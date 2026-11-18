@@ -1,0 +1,30 @@
+{
+  "ref": "refs/heads/main",
+  "before": "b6c4182f9c1a4d3b7e5c08a1d6f4b2e9c7a05d3e",
+  "after": "7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0",
+  "repository": {
+    "id": 41,
+    "name": "lingo-swipe",
+    "owner": { "username": "apps", "full_name": "Apps" },
+    "full_name": "apps/lingo-swipe",
+    "html_url": "https://git.example.com/apps/lingo-swipe",
+    "default_branch": "main"
+  },
+  "commits": [
+    {
+      "id": "9c1a4d3b7e5c08a1d6f4b2e9c7a05d3e18b6c42f",
+      "message": "fix: keep deck index in the cache\n",
+      "url": "https://git.example.com/apps/lingo-swipe/commit/9c1a4d3b7e5c08a1d6f4b2e9c7a05d3e18b6c42f"
+    },
+    {
+      "id": "7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0",
+      "message": "chore: bump the deck fixture\n",
+      "url": "https://git.example.com/apps/lingo-swipe/commit/7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0"
+    }
+  ],
+  "head_commit": {
+    "id": "7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0",
+    "message": "chore: bump the deck fixture\n"
+  },
+  "pusher": { "name": "dpinsel", "email": "dpinsel@example.com" }
+}

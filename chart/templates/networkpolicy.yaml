@@ -1,0 +1,39 @@
+{{- if .Values.networkPolicy.enabled }}
+# A plugin has two platform clients, both in AInsel's namespace: the hub, through
+# which every browser and agent request reaches it, and the event-source-gateway
+# operator, which reads the plugin's manifest. Default-deny the rest so a pod in
+# another namespace cannot talk to the plugin directly and bypass the hub's auth
+# and group filter. Each entry of networkPolicy.allowFrom renders as its own
+# podSelector peer: peers are OR'd, so merging the two into one peer would AND
+# their labels and admit neither.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "forgejo.fullname" . }}
+  labels:
+    {{- include "forgejo.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "forgejo.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # An empty from admits every source, and an empty matchLabels every pod in
+    # the namespace: both would turn this policy into allow-all, so refuse them.
+    {{- if not .Values.networkPolicy.allowFrom }}
+    {{- fail "networkPolicy.allowFrom must name at least the hub and the operator" }}
+    {{- end }}
+    - from:
+        {{- range .Values.networkPolicy.allowFrom }}
+        {{- if not . }}
+        {{- fail "networkPolicy.allowFrom entries must not be empty" }}
+        {{- end }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+{{- end }}

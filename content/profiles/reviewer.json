@@ -1,0 +1,27 @@
+{
+  "tools": [
+    "create_issue_comment",
+    "create_pull_review",
+    "get_commit_statuses",
+    "get_file_content",
+    "get_issue_by_index",
+    "get_issue_comment",
+    "get_my_user_info",
+    "get_pull_request_by_index",
+    "get_pull_request_diff",
+    "get_pull_request_status",
+    "get_pull_review",
+    "get_repo_tree",
+    "list_branches",
+    "list_issue_comments",
+    "list_my_repos",
+    "list_pull_request_files",
+    "list_pull_review_comments",
+    "list_pull_reviews",
+    "list_repo_commits",
+    "list_repo_contents",
+    "list_repo_pull_requests",
+    "search_repos",
+    "submit_pull_review"
+  ]
+}

@@ -1,0 +1,72 @@
+# Default values for the forgejo plugin chart.
+
+image:
+  repository: ghcr.io/ainsel-project/ainsel-plugin-forgejo
+  # digest is required: AInsel's Plugin resource pins the image by digest, so a
+  # signed release binds to exactly what runs. The chart refuses to render
+  # without it (see chart/tests/render_test.sh).
+  digest: ""
+
+service:
+  # The only port this chart owns: the container port, the $PORT the binary
+  # reads, the Service port and the NetworkPolicy's allowed port all render from
+  # here (pinned by chart/tests/render_test.sh). The hub's port is a different
+  # one and lives in hub.url.
+  port: 8080
+
+hub:
+  # Where the plugin reaches the hub, rendered as the container's $HUB_URL. The
+  # hub's Service name and port in AInsel's own namespace, which is where plugins
+  # are installed. Empty leaves hub calls disabled, so the plugin still runs
+  # standalone.
+  url: http://hub:8080
+
+forgejo:
+  # The Forgejo instance this plugin talks about, rendered as the container's
+  # $FORGEJO_BASE_URL and offered as the default in the setup wizard. Every
+  # issue, PR and repo the plugin shows is linked back to this address, so it is
+  # a value and not a guess: an install pointed at a different Forgejo sets it.
+  baseURL: ""
+
+persistence:
+  # The plugin's install store: what the wizard created on AInsel, so a restart
+  # does not lose track of it. The pod runs with a read-only root filesystem, so
+  # this volume is the one place it may write; it is mounted at /data and the
+  # container's $DATA_DIR points there.
+  enabled: true
+  size: 1Gi
+  # storageClass names the StorageClass the PVC asks for. Empty uses the
+  # cluster's default, which is what a dev install has.
+  storageClass: ""
+
+plugin:
+  # create renders the ainsel.dev/v1alpha1 Plugin resource that registers this
+  # plugin with the hub. Turn it off when the CR is managed elsewhere (e.g. by
+  # GitOps or a separate app-of-apps).
+  create: true
+  disabled: false
+  # Permissions from the closed vocabulary the plugin is granted without an
+  # admin approving each one. Empty means the list is left off the resource.
+  approvedPermissions: []
+  # Group ids whose background identity the plugin may act for, when there is no
+  # user behind the call. Empty means the list is left off the resource; an admin
+  # grants it later too, e.g. with AInsel's set_plugin_group_access tool.
+  groupAccess: []
+
+networkPolicy:
+  enabled: true
+  # Who may reach the plugin's service port. Nothing else talks to a plugin
+  # directly: the browser and agents go through the hub proxy, and a pod that
+  # reached the plugin on its own would bypass the hub's authentication, the
+  # permission checks and the group filtering. These are the two label sets
+  # AInsel admits to plugin pods; each entry is one podSelector peer.
+  allowFrom:
+    - app.kubernetes.io/component: hub
+    - app.kubernetes.io/component: event-gateway-operator
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

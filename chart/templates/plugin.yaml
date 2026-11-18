@@ -1,0 +1,34 @@
+{{- if .Values.plugin.create }}
+# The Plugin resource is what registers this plugin with the AInsel hub: the hub
+# reads the manifest from spec.service, proxies /ainsel-plugin.json, /ui/, /api/
+# and /mcp through itself, and pins spec.image.digest so what runs is what was
+# signed. metadata.name is the plugin id, not the release name: AInsel identifies
+# a plugin by its id (which also prefixes its MCP tool names).
+apiVersion: ainsel.dev/v1alpha1
+kind: Plugin
+metadata:
+  name: {{ include "forgejo.pluginId" . }}
+  labels:
+    {{- include "forgejo.labels" . | nindent 4 }}
+spec:
+  # Matches the manifest's displayName, so the console can list the plugin
+  # before it has been reached.
+  displayName: Forgejo
+  service:
+    # The name the Service in this chart actually gets, and the port it is
+    # exposed on -- pinned by chart/tests/render_test.sh.
+    name: {{ include "forgejo.fullname" . }}
+    port: {{ .Values.service.port }}
+  image:
+    repository: {{ .Values.image.repository }}
+    digest: {{ required "image.digest is required" .Values.image.digest }}
+  disabled: {{ .Values.plugin.disabled }}
+  {{- with .Values.plugin.approvedPermissions }}
+  approvedPermissions:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.plugin.groupAccess }}
+  groupAccess:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

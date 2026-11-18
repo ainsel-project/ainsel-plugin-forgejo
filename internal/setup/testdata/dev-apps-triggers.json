@@ -1,0 +1,156 @@
+[
+  {
+    "name": "trigger-refiner-issue-opened-apps",
+    "agentRef": "a-refiner",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "issues"
+      },
+      {
+        "field": "action",
+        "op": "eq",
+        "value": "opened"
+      },
+      {
+        "field": "issue.labels",
+        "op": "not-contains",
+        "value": "do-not-refine"
+      }
+    ]
+  },
+  {
+    "name": "trigger-refiner-mention-apps",
+    "agentRef": "a-refiner",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "issue_comment"
+      },
+      {
+        "field": "comment.body",
+        "op": "contains",
+        "value": "@refine-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "dev-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "review-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "refine-agent"
+      }
+    ]
+  },
+  {
+    "name": "trigger-reviewer-mention-apps",
+    "agentRef": "a-reviewer",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "issue_comment"
+      },
+      {
+        "field": "comment.body",
+        "op": "contains",
+        "value": "@review-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "dev-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "review-agent"
+      },
+      {
+        "field": "comment.user.login",
+        "op": "neq",
+        "value": "refine-agent"
+      }
+    ]
+  },
+  {
+    "name": "trigger-refiner-issue-reopened-apps",
+    "agentRef": "a-refiner",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "issues"
+      },
+      {
+        "field": "action",
+        "op": "eq",
+        "value": "reopened"
+      },
+      {
+        "field": "issue.labels",
+        "op": "not-contains",
+        "value": "do-not-refine"
+      }
+    ]
+  },
+  {
+    "name": "trigger-developer-mention-apps",
+    "agentRef": "a-14b9fb30",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "issue_comment"
+      },
+      {
+        "field": "comment.body",
+        "op": "contains",
+        "value": "@dev-agent"
+      }
+    ]
+  },
+  {
+    "name": "trigger-developer-ci-failure-apps",
+    "agentRef": "a-14b9fb30",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "trigger_user_login",
+        "op": "eq",
+        "value": "maestro-bot"
+      }
+    ]
+  },
+  {
+    "name": "trigger-reviewer-pr-opened-apps",
+    "agentRef": "a-reviewer",
+    "connectorRef": "c-724d9d68",
+    "filters": [
+      {
+        "field": "type",
+        "op": "eq",
+        "value": "pull_request"
+      },
+      {
+        "field": "action",
+        "op": "eq",
+        "value": "opened"
+      }
+    ]
+  }
+]

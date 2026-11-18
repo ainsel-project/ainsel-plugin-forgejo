@@ -1,0 +1,22 @@
+{
+  "action": "opened",
+  "repository": {
+    "id": 41,
+    "name": "lingo-swipe",
+    "owner": { "username": "apps", "full_name": "Apps" },
+    "full_name": "apps/lingo-swipe",
+    "html_url": "https://git.example.com/apps/lingo-swipe",
+    "default_branch": "main"
+  },
+  "issue": {
+    "id": 1007,
+    "number": 7,
+    "title": "Swipe deck loses progress on reload",
+    "body": "Open a deck, swipe three cards, reload the page: the deck starts over at the first card.",
+    "html_url": "https://git.example.com/apps/lingo-swipe/issues/7",
+    "state": "open",
+    "comments": 0,
+    "labels": [{ "id": 3, "name": "bug" }]
+  },
+  "sender": { "username": "dpinsel", "full_name": "D. Pinsel" }
+}

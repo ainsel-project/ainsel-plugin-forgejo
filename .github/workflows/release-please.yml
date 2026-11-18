@@ -1,0 +1,80 @@
+name: Release Please
+
+# release-please decides *what* the release is; release.yml publishes it.
+#
+# Every push to main runs release-please-action, which reads conventional
+# commits, maintains CHANGELOG.md, keeps the version in ainsel-plugin.json and
+# chart/Chart.yaml in step (release-please-config.json extra-files), and opens a
+# release PR. Merging that PR cuts the release: release-please creates the
+# vX.Y.Z tag and the GitHub Release, and this run then starts release.yml on
+# that tag.
+#
+# Publishing has to run on the tag, not here on main: the cosign keyless
+# signature carries the workflow ref as its identity, and AInsel trusts
+# release.yml@refs/tags/v.* (docs/release.md). A tag created with the workflow
+# token triggers no push workflow, so the hand-off is an explicit
+# workflow_dispatch on the tag ref - the one event that token may start.
+#
+# This is the same flow as ainsel-project/ainsel: merge PRs as usual -> review
+# the release PR (its diff is the dry run: version, changelog, chart bump) ->
+# merge it -> artifacts appear.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write        # release PR branch, tag, GitHub Release
+  pull-requests: write   # open and update the release PR
+  actions: write         # start release.yml on the new tag
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    steps:
+      # The workflow token on purpose, never a PAT: a tag pushed with a PAT
+      # would also fire release.yml's own tag trigger, and the release would be
+      # published twice.
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          target-branch: main
+
+      # release-please's outputs are data, not shell: keep them in the
+      # environment, out of the command text.
+      - name: Publish the release
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref "${RELEASE_TAG}"
+          echo "Release ${RELEASE_TAG} created - release.yml started on the tag." >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Report what release-please did
+        if: steps.release.outputs.release_created != 'true'
+        env:
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_PR}" ]; then
+            echo "Release PR open/updated - nothing to publish until it is merged." >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "No release-worthy commits since the last release." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      # Opening a PR needs "Allow GitHub Actions to create and approve pull
+      # requests" (Settings -> Actions -> General), and the raw error does not
+      # say which setting to change. The token cannot read the setting, so the
+      # hint fires on any failure and says so.
+      - name: Explain the failure
+        if: failure() && steps.release.outcome == 'failure'
+        run: |
+          echo "::error::release-please failed. If it could not open a PR, enable Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests' and re-run this job."

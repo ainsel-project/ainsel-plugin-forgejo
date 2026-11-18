@@ -1,0 +1,45 @@
+{
+  "action": "created",
+  "repository": {
+    "id": 41,
+    "name": "lingo-swipe",
+    "owner": { "username": "apps", "full_name": "Apps" },
+    "full_name": "apps/lingo-swipe",
+    "html_url": "https://git.example.com/apps/lingo-swipe",
+    "default_branch": "main"
+  },
+  "issue": {
+    "id": 1012,
+    "number": 12,
+    "title": "Add offline deck cache",
+    "body": "Cards should stay swipeable with no network.",
+    "html_url": "https://git.example.com/apps/lingo-swipe/pulls/12",
+    "state": "open",
+    "comments": 1
+  },
+  "comment": {
+    "id": 8842,
+    "body": "Please cover the eviction path before this merges.",
+    "html_url": "https://git.example.com/apps/lingo-swipe/pulls/12#issuecomment-8842"
+  },
+  "pull_request": {
+    "id": 1012,
+    "number": 12,
+    "title": "Add offline deck cache",
+    "body": "Caches the active deck in IndexedDB and falls back to the network on a miss.",
+    "html_url": "https://git.example.com/apps/lingo-swipe/pulls/12",
+    "state": "open",
+    "head": {
+      "label": "apps:feat/offline-cache",
+      "ref": "feat/offline-cache",
+      "sha": "2f9c1a4d3b7e5c08a1d6f4b2e9c7a05d3e18b6c4"
+    },
+    "base": {
+      "label": "apps:main",
+      "ref": "main",
+      "sha": "b6c4182f9c1a4d3b7e5c08a1d6f4b2e9c7a05d3e"
+    },
+    "merged": false
+  },
+  "sender": { "username": "dpinsel", "full_name": "D. Pinsel" }
+}

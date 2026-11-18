@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "forgejo.fullname" . }}
+  labels:
+    {{- include "forgejo.labels" . | nindent 4 }}
+spec:
+  # One replica: a plugin is stateless and scales with the hub's traffic, but an
+  # HPA would need a metric this chart does not invent. Raise this per install.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "forgejo.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "forgejo.podLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # The image's USER is the name "nonroot"; the kubelet can only verify
+        # runAsNonRoot against a numeric uid, so the uid is pinned here.
+        runAsUser: 65532
+        runAsGroup: 65532
+        # The data volume is provisioned owned by root, and the container runs as
+        # the distroless nonroot uid (65532, see the Dockerfile). Without an
+        # fsGroup the first write to $DATA_DIR is a permission error, so the group
+        # is set here and the kubelet makes the mount group-writable for it.
+        fsGroup: 65532
+      containers:
+        - name: plugin
+          # Pinned by digest, the same digest the Plugin resource carries, so
+          # what runs is what the hub registered and what release signing bound.
+          image: "{{ .Values.image.repository }}@{{ required "image.digest is required" .Values.image.digest }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            # The binary listens on $PORT. It is rendered from the same value the
+            # container port, the Service and the NetworkPolicy use, so the port
+            # the hub reaches and the port the binary binds cannot drift apart.
+            - name: PORT
+              value: "{{ .Values.service.port }}"
+            # Where the plugin reaches the hub, to call back with the credential
+            # the hub forwarded on a proxied request. It defaults to the hub
+            # Service in AInsel's namespace, which is where plugins are
+            # installed; an empty value means the plugin runs standalone with hub
+            # calls disabled.
+            - name: HUB_URL
+              value: {{ .Values.hub.url | quote }}
+            # The Forgejo instance the plugin talks about, offered to the setup
+            # wizard as its default. The links the plugin shows are built from it,
+            # so an install pointed at another Forgejo sets it there.
+            - name: FORGEJO_BASE_URL
+              value: {{ .Values.forgejo.baseURL | quote }}
+            # Where the plugin keeps its install store. It is a fixed path, and it
+            # is the mountPath of the data volume below: the two are the same
+            # directory, pinned together by chart/tests/render_test.sh.
+            - name: DATA_DIR
+              value: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # The one writable directory: the plugin's root filesystem is read
+            # only, so everything the plugin keeps goes here.
+            - name: data
+              mountPath: /data
+          securityContext:
+            readOnlyRootFilesystem: true
+            # The pod runs as a fixed non-root uid with no capabilities; these
+            # close the two remaining ways a container process gets privileges
+            # back: setuid/escalation and a kernel profile the runtime allows.
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "forgejo.pvcName" . }}
+          {{- else }}
+          # Persistence switched off leaves the store to the pod's lifetime: the
+          # mount is still there, so $DATA_DIR always exists.
+          emptyDir: {}
+          {{- end }}

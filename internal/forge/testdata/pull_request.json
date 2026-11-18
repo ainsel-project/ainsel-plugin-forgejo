@@ -1,0 +1,33 @@
+{
+  "action": "opened",
+  "number": 88,
+  "repository": {
+    "id": 12,
+    "name": "cockpit",
+    "owner": { "username": "dpinsel", "full_name": "D. Pinsel" },
+    "full_name": "dpinsel/cockpit",
+    "html_url": "https://git.example.com/dpinsel/cockpit",
+    "default_branch": "main"
+  },
+  "pull_request": {
+    "id": 2088,
+    "number": 88,
+    "title": "Register the forgejo plugin in the chart",
+    "body": "Adds the Plugin resource for the forgejo plugin, off by default.\nThe chart keeps the hub's own resources untouched.",
+    "html_url": "https://git.example.com/dpinsel/cockpit/pulls/88",
+    "state": "open",
+    "draft": false,
+    "head": {
+      "label": "dpinsel:feat/register-forgejo-plugin",
+      "ref": "feat/register-forgejo-plugin",
+      "sha": "7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0"
+    },
+    "base": {
+      "label": "dpinsel:main",
+      "ref": "main",
+      "sha": "05d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a"
+    },
+    "merged": false
+  },
+  "sender": { "username": "dpinsel", "full_name": "D. Pinsel" }
+}

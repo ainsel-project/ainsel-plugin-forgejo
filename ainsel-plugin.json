@@ -1,0 +1,45 @@
+{
+  "id": "forgejo",
+  "displayName": "Forgejo",
+  "version": "0.1.0",
+  "pluginApi": "1.1",
+  "description": "What AInsel agents do on Forgejo, and a quick setup for them.",
+  "ui": {
+    "entry": "/ui/index.js",
+    "pages": [
+      { "path": "/now", "label": "Live", "section": "Forgejo", "icon": "activity", "component": "LivePage" },
+      { "path": "/work", "label": "Issues & PRs", "section": "Forgejo", "icon": "git-pull-request", "component": "WorkPage" },
+      { "path": "/settings", "label": "Settings", "section": "Forgejo", "icon": "sliders-horizontal", "component": "SettingsPage", "visibility": "admin" },
+      { "path": "/setup", "label": "Setup", "section": "Forgejo", "icon": "settings", "component": "SetupPage", "visibility": "admin" }
+    ],
+    "slots": { "invocation.panel": "ForgejoInvocationPanel", "agent.panel": "ForgejoAgentPanel" }
+  },
+  "api": { "basePath": "/api" },
+  "mcp": {
+    "path": "/mcp",
+    "audience": { "list_work": "both", "get_work_item": "both", "setup_options": "operator", "setup_plan": "operator", "setup_apply": "operator", "setup_orphans_plan": "operator", "setup_orphans_remove": "operator" }
+  },
+  "skills": [
+    {
+      "name": "forgejo",
+      "description": "How Forgejo agents hand off work and read what AInsel did",
+      "path": "/skills/forgejo/SKILL.md"
+    }
+  ],
+  "permissions": [
+    "invocations:read",
+    "observability:read",
+    "agents:read",
+    "agents:write",
+    "agent-images:read",
+    "agent-images:write",
+    "personas:read",
+    "personas:write",
+    "connectors:read",
+    "connectors:write",
+    "triggers:read",
+    "triggers:write",
+    "mcp-servers:read",
+    "mcp-servers:write"
+  ]
+}

@@ -1,0 +1,165 @@
+name: Release
+
+# release-please.yml starts this on the vX.Y.Z tag it just created (a
+# workflow_dispatch with --ref <tag>); pushing a tag by hand runs it too. It
+# always runs on a tag ref, because that ref is the cosign signing identity
+# installers trust (release.yml@refs/tags/v.*).
+#
+# A release publishes the plugin: the image goes to GHCR
+# pinned by digest, that digest is signed with cosign keyless (GitHub OIDC, no
+# private key to keep), and the Helm chart is packaged and pushed next to it.
+# The job summary prints the digest, because that is exactly what the admin
+# passes to the chart as image.digest — the tag is never what gets deployed.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # push the image and the chart to GHCR
+  id-token: write   # cosign keyless: the OIDC token is the signing identity
+
+jobs:
+  release:
+    name: Build, sign and publish
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/ainsel-project/ainsel-plugin-forgejo
+      CHART_OCI: oci://ghcr.io/ainsel-project/charts
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      # The v prefix is dropped so the image tag, the chart version and the
+      # appVersion all read the same (v0.1.0 -> 0.1.0).
+      # A dispatch can name any ref. Anything but a v tag would publish a
+      # version nobody cut, signed with an identity no installer trusts.
+      - name: Refuse anything but a release tag
+        run: |
+          set -euo pipefail
+          case "${GITHUB_REF}" in
+            refs/tags/v*) ;;
+            *) echo "::error::release.yml runs on a vX.Y.Z tag, not ${GITHUB_REF}" >&2; exit 1 ;;
+          esac
+
+      - name: Read the version from the tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # ainsel-plugin.json's version is what the hub shows and the API and MCP
+      # endpoint report. release-please bumps it with the tag; a tag pushed by
+      # hand without the bump would publish an image that names the old one.
+      - name: Gate - ainsel-plugin.json names the release version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          have="$(python3 -c 'import json; print(json.load(open("ainsel-plugin.json"))["version"])')"
+          if [ "${have}" != "${VERSION}" ]; then
+            echo "::error::ainsel-plugin.json version is ${have}, release is ${VERSION}" >&2
+            exit 1
+          fi
+          echo "ok: ainsel-plugin.json version is ${VERSION}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Describe the image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push the plugin image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Keyless: the signature carries the workflow's OIDC identity as a
+      # certificate, so verification is done against the repo and workflow ref.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      # The chart is named after the plugin, so its name is read from Chart.yaml
+      # instead of being hardcoded here: renaming the chart is then enough and
+      # nothing else has to change.
+      # The version comes from the tag, and git refnames may contain $, backticks
+      # and quotes — so it crosses into the script as an env var and is never
+      # interpolated into it, where a crafted tag would execute in the runner.
+      - name: Package the chart
+        id: chart
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          [ -n "$VERSION" ] || { echo '::error::empty version from the tag' >&2; exit 1; }
+          name="$(awk '/^name: /{print $2; exit}' chart/Chart.yaml)"
+          [ -n "$name" ] || { echo '::error::chart/Chart.yaml has no name' >&2; exit 1; }
+          helm package chart --version "$VERSION" --app-version "$VERSION" --destination dist
+          tgz="$(find dist -maxdepth 1 -name '*.tgz' -print -quit)"
+          [ -n "$tgz" ] || { echo '::error::helm package produced no tarball' >&2; exit 1; }
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "tgz=$tgz" >> "$GITHUB_OUTPUT"
+          echo "packaged: $tgz"
+
+      # The tarball name carries the tag-derived version, so it is env-passed too.
+      - name: Push the chart to GHCR
+        env:
+          TGZ: ${{ steps.chart.outputs.tgz }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${GITHUB_TOKEN}" | helm registry login ghcr.io \
+            --username "${GITHUB_ACTOR}" --password-stdin
+          helm push "$TGZ" "$CHART_OCI"
+
+      - name: Record the release
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.version.outputs.version }}
+          CHART: ${{ steps.chart.outputs.name }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Release ${GITHUB_REF_NAME}"
+            echo
+            echo "| Artifact | Location |"
+            echo '| --- | --- |'
+            echo "| Image | \`${IMAGE}@${DIGEST}\` |"
+            echo "| Chart | \`${CHART_OCI}/${CHART}\` (\`${VERSION}\`) |"
+            echo
+            echo "Deploy with the image pinned by digest — that is what the"
+            echo "signature above covers:"
+            echo
+            echo '```bash'
+            echo "helm install ${CHART} ${CHART_OCI}/${CHART} \\"
+            echo "  --version ${VERSION} \\"
+            echo "  --set image.repository=${IMAGE} \\"
+            echo "  --set image.digest=${DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

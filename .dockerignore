@@ -1,0 +1,14 @@
+# Git metadata and agent scratch space: nothing in the build needs them.
+.git
+.superpowers
+
+# Installed and built inside the image instead (stage ui). ui/dist matters even
+# though the next stage copies the fresh bundle over it: `COPY . .` merges rather
+# than replaces, so a stale local ui/dist/index.js — or an extra chunk left by an
+# earlier build — would be embedded and served next to the bundle the image built.
+ui/node_modules
+ui/dist
+
+# Build output from a local `make build` / `go build`.
+bin
+/plugin

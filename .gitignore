@@ -1,0 +1,14 @@
+# Build output
+/bin
+# A bare `go build ./cmd/plugin` drops the binary in the repo root.
+/plugin
+
+# UI build inputs and outputs (ui/dist/.gitkeep stays tracked so the
+# embedded directory is never missing)
+ui/node_modules/
+ui/dist/*
+!ui/dist/.gitkeep
+
+# The install store of a local run (`make run`): DATA_DIR defaults to ./data.
+/data
+.subagents/

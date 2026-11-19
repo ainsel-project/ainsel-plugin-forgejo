@@ -463,14 +463,15 @@ type desiredState struct {
 	// drift is seen against the install row's fingerprint (setup.RoleState).
 	// Each key rides an agent write only for the provider the role runs on.
 	//
-	// llmKeys doubles as the reading of the OpenAI auth method, which is not a
-	// key: it is the other half of how an openai role authenticates, and it is
-	// the half the hub can read back. The four provider key rows are a
-	// pass-through in the settings store now (settings.isLLMKeyField): they no
-	// longer answer here at all, and a key reaches an agent through PushLLMKey —
-	// the wizard's create, or the upgrade migration. The pass keeps this
-	// reading, and the key write below, for a store that still answers with a
-	// key row: the values are written as they arrive and compared by nothing.
+	// llmKeys is the reading of the OpenAI auth method, which is not a key: it is
+	// the other half of how an openai role authenticates, and it is the half the
+	// hub can read back. It holds no key, and the pass writes none. The four
+	// provider key rows are a pass-through in the settings store
+	// (settings.IsLLMKeyField): they never answer here, so a pass cannot read a
+	// key it might write — which is the point, because a key the hub never hands
+	// back is a key a pass that compared it against a stored value would rewrite
+	// on every run. A key reaches an agent through PushLLMKey, or through the
+	// wizard's create.
 	customURL map[setup.Role]string
 	llmKeys   map[setup.Role]setup.RoleLLM
 
@@ -530,25 +531,12 @@ func (e Engine) desiredState(ctx context.Context) (desiredState, error) {
 			d.llm[role] = llm
 		case settings.FieldLLMCustomUrl:
 			d.customURL[role] = s.Value
-		case settings.FieldLLMCustomKey, settings.FieldLLMOpenAIKey,
-			settings.FieldLLMAnthropicKey, settings.FieldLLMGoogleKey,
-			settings.FieldLLMOpenAIAuthMethod:
-			// The store's raw value: masking (settings.MaskSecrets) belongs to
-			// the console answer, not to this reading — the pass may write a key
-			// back to the hub.
+		case settings.FieldLLMOpenAIAuthMethod:
+			// The method, not a key: the hub reads it back, so the pass may
+			// correct it. The four key fields are never answered by the store
+			// (settings.IsLLMKeyField), so they have no case here.
 			keys := d.llmKeys[role]
-			switch s.Field {
-			case settings.FieldLLMCustomKey:
-				keys.CustomKey = s.Value
-			case settings.FieldLLMOpenAIKey:
-				keys.OpenAIKey = s.Value
-			case settings.FieldLLMAnthropicKey:
-				keys.AnthropicKey = s.Value
-			case settings.FieldLLMGoogleKey:
-				keys.GoogleKey = s.Value
-			case settings.FieldLLMOpenAIAuthMethod:
-				keys.OpenAIAuthMethod = s.Value
-			}
+			keys.OpenAIAuthMethod = s.Value
 			d.llmKeys[role] = keys
 		case settings.FieldMCPUrl:
 			if role == settings.Roles[0] {
@@ -782,22 +770,6 @@ func grantNames(names []string, slug string) []string {
 	return out
 }
 
-// keyPresence is what a correction line says about a provider key: whether one
-// was there, never what it was (R4).
-func keyPresence(hash string) string {
-	if hash == "" {
-		return "none"
-	}
-	return "set"
-}
-
-// keyFieldName names the correction a key write is recorded under — "openaiKey",
-// "customKey" — the provider's own name, because an agent now has four key
-// blocks and one bare name would not say which one moved.
-func keyFieldName(provider string) string {
-	return provider + "Key"
-}
-
 // reconcileAgent ensures an agent points at the image and the persona the
 // install stored, runs on the model the settings name, names exactly the skills
 // and MCP servers the manifest ships, and holds the grant the row's tool set
@@ -872,20 +844,14 @@ func (e Engine) reconcileAgent(ctx context.Context, in *setup.Install, role setu
 		}
 	}
 
-	// The provider's key block, while the role runs on that provider. The custom
-	// URL is readable from the hub, so drift against the settings is corrected
-	// directly. A key cannot be read back, so its drift is seen through the row's
-	// fingerprint: a key the row does not record has not reached the agent, and
-	// the pass writes it — always as the reading holds it, never as the row's
-	// (stale) text. The correction line names the key's provider and its
-	// presence, never its value (R4). Away from a provider the hub's block for it
-	// is inert and is left exactly where it is.
-	//
-	// Since the key rows left the settings table, the ordinary pass reads no key
-	// here and writes none: an entered key goes out through PushLLMKey, the only
-	// write that names a key with no copy kept behind it.
+	// The provider's key block is not this pass's to write. A key cannot be read
+	// back from the hub, so a pass that held a value to compare could only write
+	// it blind — and the settings store keeps no key to hold: the rows are a
+	// pass-through, so there is no value here to write even by accident. A key
+	// goes out through PushLLMKey, the one write that names a key with no copy
+	// kept behind it. Away from a provider the hub's block for it is inert and is
+	// left exactly where it is.
 	provider := want.llm[role].Provider
-	prevKeyHash := roleState.LLMKeyHashOf(provider)
 
 	// The OpenAI auth method, while the role runs on openai. It is the one half
 	// of the credential the hub can read back, so drift is seen against the
@@ -893,7 +859,6 @@ func (e Engine) reconcileAgent(ctx context.Context, in *setup.Install, role setu
 	// role onto the ChatGPT sign-in (or back off it) is corrected here, and the
 	// row moves with the write. Away from openai the hub's openAI block is inert
 	// and the method it holds is left exactly where it is.
-	signIn := false
 	prevAuthMethod := roleState.LLMOpenAIAuthMethod
 	if provider == setup.LLMProviderOpenAI {
 		wantMethod := setup.OpenAIAuthMethodOf(want.llmKeys[role])
@@ -908,35 +873,11 @@ func (e Engine) reconcileAgent(ctx context.Context, in *setup.Install, role setu
 			update.OpenAIAuthMethod = &method
 		}
 		roleState.LLMOpenAIAuthMethod = wantMethod
-		signIn = wantMethod == setup.LLMAuthMethodChatGPTSignIn
 	}
 
-	// A role that signs in has no key to write: the hub refuses an openAI block
-	// that names both, so the settings' key is left alone however it reads — it
-	// stays inert in the hub's block until a Reset clears it.
-	if wantKey := want.llmKeys[role].LLMKeyOf(provider); wantKey != "" && !signIn {
-		wantKeyHash := setup.CustomKeyFingerprint(wantKey)
-		keyDrift := wantKeyHash != prevKeyHash
-		if provider == setup.LLMProviderCustom {
-			// The custom block is the one with a URL beside it. A URL the hub does
-			// not hold as the settings hold it moves with the key, so a rotated key
-			// never lands on an endpoint nobody meant.
-			if wantURL := want.customURL[role]; wantURL != "" && agent.CustomURL != wantURL {
-				record("customURL", agent.CustomURL, wantURL)
-				url := wantURL
-				update.CustomURL = &url
-				keyDrift = true
-			}
-		}
-		if keyDrift {
-			record(keyFieldName(provider), keyPresence(prevKeyHash), "set")
-			key := wantKey
-			setLLMKeyField(&update, provider, &key)
-			roleState.SetLLMKeyHash(provider, wantKeyHash)
-		}
-	} else if provider == setup.LLMProviderCustom {
-		// No key in the settings to write: the URL moves alone, and the hub keeps
-		// whatever key it holds.
+	if provider == setup.LLMProviderCustom {
+		// The custom block's URL is readable from the hub, so its drift is
+		// corrected here; the key beside it is not this pass's to write.
 		if wantURL := want.customURL[role]; wantURL != "" && agent.CustomURL != wantURL {
 			record("customURL", agent.CustomURL, wantURL)
 			url := wantURL
@@ -973,16 +914,15 @@ func (e Engine) reconcileAgent(ctx context.Context, in *setup.Install, role setu
 			for _, c := range fixed {
 				sum.refused(Refusal{Install: c.Install, Role: c.Role, Kind: c.Kind, Field: c.Field, Error: err.Error()})
 			}
-			// Undo the row's claimed llm and key-fingerprint moves: the hub
-			// does not run them.
-			// (Nothing else on the row moved from what it said before.)
+			// Undo the row's claimed llm and auth-method moves: the hub does not
+			// run them. (Nothing else on the row moved from what it said before —
+			// a key fingerprint is not moved here, because a pass writes no key.)
 			var current hub.LLMSpec
 			if agent.LLM != nil {
 				current = *agent.LLM
 			}
 			roleState.LLMProvider = current.Provider
 			roleState.LLMModel = current.Model
-			roleState.SetLLMKeyHash(provider, prevKeyHash)
 			roleState.LLMOpenAIAuthMethod = prevAuthMethod
 			return
 		}

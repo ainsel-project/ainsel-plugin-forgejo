@@ -228,6 +228,14 @@ type RoleInput struct {
 	// install, and "keep what the install has" on an edit — never "reset to
 	// the default", which is what lets a hand-patched image value survive.
 	TurnTimeoutMs string
+
+	// LLMKey is the optional provider key the admin may type for the role in the
+	// wizard itself. It is a pass-through like the settings' key rows: it reaches
+	// the create (or the update) as the agent's own hub secret and never lands on
+	// the install row or in the settings table (R4). Empty says nothing — the
+	// agent is created without a key and the admin can enter one on Settings once
+	// the install exists, the way a key entered before any install has to be.
+	LLMKey string `json:"llmKey,omitempty"`
 }
 
 // RoleLLM is the model one role's agent is created on — the effective value of
@@ -236,13 +244,23 @@ type RoleInput struct {
 // CustomURL and CustomKey are read only when Provider is LLMProviderCustom:
 // they are what the apply feeds the hub's customProvider object. OpenAIKey,
 // AnthropicKey and GoogleKey are read only when Provider names their own
-// provider — the hub's openAI, anthropic and google blocks. No key ever lands
-// on the install row (R4).
+// provider — the hub's openAI, anthropic and google blocks. The four keys are
+// no longer the settings store's to hold (they are a pass-through written onto
+// the agents); what reaches this shape is either the wizard's optional per-role
+// key (KeyFromWizard) or a key an upgrade migration is forwarding. No key ever
+// lands on the install row (R4).
 //
 // OpenAIAuthMethod is read only when Provider is openai: it says whether the
 // role authenticates with OpenAIKey or with a ChatGPT sign-in an admin finishes
 // in the console (see LLMAuthMethodChatGPTSignIn). A role on the sign-in method
 // sends no key, whatever its key row holds.
+//
+// KeyFromWizard says the key this reading carries came from the wizard's own
+// optional per-role key rather than from the settings store — and the settings
+// store holds no key at all any more (the four key fields are a pass-through
+// written straight onto the role's agents). A wizard key is always a write the
+// admin asked for: the plan previews it even when the row's fingerprint already
+// matches, because the plugin keeps no copy to compare against.
 type RoleLLM struct {
 	Provider         string
 	Model            string
@@ -252,6 +270,7 @@ type RoleLLM struct {
 	AnthropicKey     string
 	GoogleKey        string
 	OpenAIAuthMethod string
+	KeyFromWizard    bool
 }
 
 // LLMKeyOf is the key a role's settings hold for the provider the role runs
@@ -272,10 +291,11 @@ func (l RoleLLM) LLMKeyOf(provider string) string {
 	return ""
 }
 
-// llmKeyFieldOf names the settings field a provider's key lives in — the field
+// LLMKeyFieldOf names the settings field a provider's key lives in — the field
 // a change op reports on, so the preview line and the settings row the admin
-// edits agree on one name.
-func llmKeyFieldOf(provider string) string {
+// edits agree on one name. It is also what the settings route and the startup
+// migration use to name the field a pushed key came from.
+func LLMKeyFieldOf(provider string) string {
 	switch provider {
 	case LLMProviderCustom:
 		return FieldLLMCustomKey
@@ -933,15 +953,15 @@ func changeOps(in Input, snap Snapshot, want Install) []Op {
 			// never be given would promise a write that cannot happen (and repeat
 			// it on every re-apply, since the row's fingerprint would never move).
 			if key := snap.llm(r).LLMKeyOf(provider); key != "" &&
-				CustomKeyFingerprint(key) != prior.LLMKeyHashOf(provider) {
-				detail := llmFieldWord(llmKeyFieldOf(provider), provider) + " replaced"
+				(snap.llm(r).KeyFromWizard || CustomKeyFingerprint(key) != prior.LLMKeyHashOf(provider)) {
+				detail := llmFieldWord(LLMKeyFieldOf(provider), provider) + " replaced"
 				if prior.LLMKeyHashOf(provider) == "" {
-					detail = diff(llmFieldWord(llmKeyFieldOf(provider), provider), "none", "set")
+					detail = diff(llmFieldWord(LLMKeyFieldOf(provider), provider), "none", "set")
 				}
 				ops = append(ops, Op{
 					Kind: KindAgent, Name: current,
 					Detail: detail,
-					Role:   r, Field: llmKeyFieldOf(provider),
+					Role:   r, Field: LLMKeyFieldOf(provider),
 				})
 			}
 		}

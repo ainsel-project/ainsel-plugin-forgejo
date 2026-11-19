@@ -432,3 +432,45 @@ func TestFakeRecordsCallsInOrder(t *testing.T) {
 		t.Errorf("calls = %v, want %v", got, want)
 	}
 }
+
+// TestFakeAcceptsAKeyOnlyAgentUpdate is the premise a provider-key push rests
+// on: an agent update naming one provider's key and nothing else is a legal
+// write, and everything the agent already holds — its name, its model, its
+// grant, the other providers' blocks — stays exactly where it was. A hub that
+// answered such an update by blanking the fields it was not handed would turn a
+// key rotation into a rewrite of the agent.
+func TestFakeAcceptsAKeyOnlyAgentUpdate(t *testing.T) {
+	f := newFake()
+	grant := []string{"mcp__forgejo-mcp-app__create_issue_comment"}
+	f.SeedAgents = map[string]Agent{
+		"a-1": {
+			ID: "a-1", Name: "apps-developer", ImageRef: "ai-1", PersonaID: "p-seed",
+			LLM:          &LLMSpec{Model: "gpt-x", Provider: "openai"},
+			EnabledTools: append([]string(nil), grant...),
+			AnthropicKey: "sk-old-anthropic",
+		},
+	}
+
+	if err := f.UpdateAgent(context.Background(), "a-1", AgentUpdate{
+		OpenAIKey: ptrTo("sk-new"),
+	}); err != nil {
+		t.Fatalf("UpdateAgent: %v", err)
+	}
+
+	got := f.SeedAgents["a-1"]
+	if got.OpenAIKey != "sk-new" {
+		t.Errorf("openai key = %q, want the pushed key", got.OpenAIKey)
+	}
+	if got.Name != "apps-developer" || got.ImageRef != "ai-1" || got.PersonaID != "p-seed" {
+		t.Errorf("the update moved the agent's identity: %+v", got)
+	}
+	if got.LLM == nil || got.LLM.Model != "gpt-x" || got.LLM.Provider != "openai" {
+		t.Errorf("the update moved the agent's llm: %+v", got.LLM)
+	}
+	if !reflect.DeepEqual(got.EnabledTools, grant) {
+		t.Errorf("the update moved the agent's grant: %v", got.EnabledTools)
+	}
+	if got.AnthropicKey != "sk-old-anthropic" {
+		t.Errorf("the update moved a block it did not name: %q", got.AnthropicKey)
+	}
+}

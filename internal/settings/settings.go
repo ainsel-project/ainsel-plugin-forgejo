@@ -18,11 +18,13 @@
 // The rows live in the same SQLite file as the installs: the settings are the
 // plugin's, and one file keeps one directory to mount and one thing to back
 // up. The MCP token field stores the name of the env var a token arrives in,
-// never a token. The secrets this table does hold are a role's LLM provider
-// keys (llmCustomKey, llmOpenAIKey, llmAnthropicKey, llmGoogleKey): each is
-// write-mostly — an answer served to the console never carries it back (see
-// MaskSecrets), and an empty save keeps what is stored. A secret-reference
-// store is the cleaner long-term shape and is left as a follow-up.
+// never a token. Like the install store, this table holds no secret: a role's
+// LLM provider keys (llmCustomKey, llmOpenAIKey, llmAnthropicKey, llmGoogleKey)
+// are a write-only pass-through here (see isLLMKeyField) — Save accepts them
+// and writes no row, every answer for them is empty, and their home is the
+// hub's per-agent secret on the role's agents (reconcile.Engine.PushLLMKey).
+// The plugin keeps no copy, so there is nothing here to hand a backup, and
+// nothing to leak off the plugin's volume.
 package settings
 
 import (
@@ -64,10 +66,18 @@ const (
 	FieldLLMProvider  = "llmProvider"
 	FieldLLMModel     = "llmModel"
 	FieldLLMCustomUrl = "llmCustomUrl"
+	// FieldLLMCustomKey is the API key the custom endpoint expects. It is a
+	// pass-through, not a setting this store keeps: Save accepts it and writes
+	// no row, and every answer for it is empty. Its home is the hub's secret
+	// store, on each of the role's agents (see reconcile.Engine.PushLLMKey,
+	// which the settings route calls), and the plugin keeps no copy — so there
+	// is nothing here to mask, nothing to read back, and no plaintext on the
+	// plugin's volume. Entering it empty means "leave what the agents hold";
+	// replacing it means typing the new key.
 	FieldLLMCustomKey = "llmCustomKey"
 	// The three provider keys the plugin delivers for the vendor providers it
-	// has credentials for. Each is write-mostly exactly like llmCustomKey — see
-	// isLLMKeyField.
+	// has credentials for. Each is a pass-through exactly like llmCustomKey —
+	// see isLLMKeyField.
 	FieldLLMOpenAIKey = "llmOpenAIKey"
 	// FieldLLMOpenAIAuthMethod is the dropdown that chooses how a role on the
 	// openai provider authenticates: an API key (the shipped default, and what
@@ -158,18 +168,32 @@ var LLMProviders = []LLMProvider{
 	{Value: setup.LLMProviderCustom, Label: "Custom"},
 }
 
-// isLLMKeyField says whether a field is one of the four write-mostly LLM
+// isLLMKeyField says whether a field is one of the four pass-through LLM
 // provider keys: the custom pair's key plus the three vendor provider keys.
-// They share one contract — the console answer never carries the value
-// (MaskSecrets), an empty save keeps what is stored (Save), and a reset is
-// what clears it — so the two rules are set-membership checks over this one
-// list rather than four copies of the same branch.
+// They share one contract — no answer ever carries the value (All, Effective,
+// MaskSecrets), Save accepts the field and stores nothing, and the key's home
+// is the hub's per-agent secret — so the rules are set-membership checks over
+// this one list rather than four copies of the same branch.
 func isLLMKeyField(field string) bool {
 	switch field {
 	case FieldLLMCustomKey, FieldLLMOpenAIKey, FieldLLMAnthropicKey, FieldLLMGoogleKey:
 		return true
 	}
 	return false
+}
+
+// IsLLMKeyField is the exported reading of the same membership: the routes
+// that refuse, forward or mask a key field ask it by name rather than keeping
+// their own copy of the four-field list.
+func IsLLMKeyField(field string) bool { return isLLMKeyField(field) }
+
+// llmKeyFields are the four key rows in the registry's own order — the list
+// the upgrade migration reads and prunes by (PendingLLMKeys, DeleteLLMKeys).
+var llmKeyFields = []string{
+	FieldLLMCustomKey,
+	FieldLLMOpenAIKey,
+	FieldLLMAnthropicKey,
+	FieldLLMGoogleKey,
 }
 
 // DefaultMCPUrl is empty: which forge MCP endpoint to point at is a fact about
@@ -401,6 +425,14 @@ func (s *Store) All(ctx context.Context) ([]Setting, error) {
 		if err := rows.Scan(&k.role, &k.field, &r.value, &r.dirty, &r.defaultVersion); err != nil {
 			return nil, fmt.Errorf("settings: cannot read a setting: %w", err)
 		}
+		// A key row is never an answer. The upgrade migration forwards the
+		// stored keys onto the agents and deletes the rows (PendingLLMKeys,
+		// DeleteLLMKeys); until it has, or for a row an older binary wrote by
+		// hand, reading one would put a plaintext key back into an answer the
+		// console, the wizard and the pass all see.
+		if isLLMKeyField(k.field) {
+			continue
+		}
 		stored[k] = r
 	}
 	if err := rows.Err(); err != nil {
@@ -438,25 +470,12 @@ func (s *Store) All(ctx context.Context) ([]Setting, error) {
 	return out, nil
 }
 
-// storedRow reads one row's raw text and dirty flag, with no default folded
-// in: the keep-the-stored-key write needs both halves, where Effective answers
-// with the winner of the two.
-func (s *Store) storedRow(ctx context.Context, role setup.Role, field string) (string, bool, error) {
-	const q = `SELECT value, dirty FROM settings WHERE role = ? AND field = ?;`
-	var value string
-	var dirty int
-	switch err := s.db.QueryRowContext(ctx, q, string(role), field).Scan(&value, &dirty); {
-	case errors.Is(err, sql.ErrNoRows):
-		return "", false, nil
-	case err != nil:
-		return "", false, fmt.Errorf("settings: cannot read %s.%s: %w", role, field, err)
-	}
-	return value, dirty == 1, nil
-}
-
 // Effective returns the value in force for one (role, field): the admin's edit
 // while its row is dirty, the shipped default otherwise — the same winner rule All
 // answers with, for one row instead of the whole table.
+//
+// A key field answers its empty default whatever the row says: the store keeps
+// no key (see isLLMKeyField), so it never answers one either.
 //
 // This is the read the skill endpoint does per request. The hub re-fetches every
 // declared skill's body on every sync pass, so the answer has to reflect a PUT that
@@ -464,6 +483,9 @@ func (s *Store) storedRow(ctx context.Context, role setup.Role, field string) (s
 // is the cheapest read this table has, and a settings save needs no invalidation
 // step because nothing here is cached.
 func (s *Store) Effective(ctx context.Context, role setup.Role, field string) (string, error) {
+	if isLLMKeyField(field) {
+		return Default(role, field), nil
+	}
 	const q = `SELECT value, dirty FROM settings WHERE role = ? AND field = ?;`
 	var value string
 	var dirty int
@@ -486,6 +508,13 @@ func (s *Store) Effective(ctx context.Context, role setup.Role, field string) (s
 // refusal comes back as a ValidationError naming each bad edit without the
 // database seeing any of them. What is left goes in one transaction, so a
 // crash cannot land half a PUT.
+//
+// The four key fields are accepted and written nowhere (see isLLMKeyField):
+// the value arrives here only so the route that called Save can forward it to
+// the role's agents, where the hub keeps it as the agent's own secret. A store
+// that holds no copy of a key has nothing to keep on an empty save and nothing
+// to clear on a reset — the hub has no way back to "no key", only forward to a
+// new one.
 func (s *Store) Save(ctx context.Context, edits []Edit) error {
 	var bad []FieldError
 	seen := map[key]bool{}
@@ -533,23 +562,6 @@ func (s *Store) Save(ctx context.Context, edits []Edit) error {
 			// not "no opinion" — so the version recorded here is the version
 			// the admin re-adopted.
 			value, dirty = Default(setup.Role(e.Role), e.Field), 0
-		} else if isLLMKeyField(e.Field) && e.Value == "" {
-			// The key is write-mostly: an empty save keeps the key that is
-			// stored (the console can never show it, so an empty field means
-			// "leave it alone", never "clear it" — clearing is what a reset
-			// does). The row's edited tag rides with it: keeping a stored key
-			// keeps the tag, and keeping a row that had nothing to keep leaves
-			// an unedited row unedited — edited means "a key is stored", and
-			// this write must not break that.
-			stored, storedDirty, err := s.storedRow(ctx, setup.Role(e.Role), e.Field)
-			if err != nil {
-				return err
-			}
-			if storedDirty {
-				value, dirty = stored, 1
-			} else {
-				value, dirty = Default(setup.Role(e.Role), e.Field), 0
-			}
 		}
 		values[i], dirtyFlags[i] = value, dirty
 	}
@@ -568,6 +580,12 @@ ON CONFLICT (role, field) DO UPDATE SET
 	dirty = excluded.dirty,
 	default_version = excluded.default_version;`
 	for i, e := range edits {
+		if isLLMKeyField(e.Field) {
+			// The key's home is the hub, on the role's agents. Writing the row
+			// here is the thing this field stopped doing: the plugin would be
+			// holding a plaintext copy of a secret it can never read back out.
+			continue
+		}
 		if _, err := tx.ExecContext(ctx, q, e.Role, e.Field, values[i], dirtyFlags[i], PluginVersion()); err != nil {
 			return fmt.Errorf("settings: cannot save %s.%s: %w", e.Role, e.Field, err)
 		}
@@ -717,7 +735,7 @@ func checkOpenAIAuthMethodRule(edits []Edit) error {
 		bad = append(bad, FieldError{
 			Role:  string(role),
 			Field: FieldLLMOpenAIAuthMethod,
-			Error: "ChatGPT sign-in sends no API key (save an empty " + FieldLLMOpenAIKey + " to keep the stored key, or keep " + setup.LLMAuthMethodAPIKey + ")",
+			Error: "ChatGPT sign-in sends no API key (leave " + FieldLLMOpenAIKey + " empty to keep what the agents hold, or keep " + setup.LLMAuthMethodAPIKey + ")",
 		})
 	}
 	if len(bad) > 0 {
@@ -727,18 +745,74 @@ func checkOpenAIAuthMethodRule(edits []Edit) error {
 }
 
 // MaskSecrets blanks the value of every secret-bearing row of a settings
-// answer, in place: the four LLM provider key rows (isLLMKeyField), whose
-// stored key is never returned to the console (the same rule the hub names for
-// its own agent responses). The dirty flag stays, so the row still reads as
-// edited — an empty field there means "keep the stored key", and a reset is
-// what clears it. The store keeps the raw value; only an answer being served
-// is masked.
+// answer, in place: the four LLM provider key rows (isLLMKeyField). The rule
+// is belt-and-braces now that no key field has a row to answer with: a field
+// that must never reach a browser is blanked on the way out whatever the store
+// says about it — a legacy row the migration has not forwarded yet, or a
+// future one written by hand, cannot reach a console through this answer.
+// The dirty flag stays, so the row still reads as edited. The store keeps the
+// raw value only for the migration; only an answer being served is masked.
 func MaskSecrets(settings []Setting) {
 	for i := range settings {
 		if isLLMKeyField(settings[i].Field) {
 			settings[i].Value = ""
 		}
 	}
+}
+
+// PendingLLMKey is one stored provider key the upgrade migration has not
+// forwarded yet: the (role, field) it was stored under and the value.
+//
+// This is the one read in this package that hands back a stored key, and it
+// exists for exactly one caller — the startup migration (cmd/plugin) that
+// forwards each key onto the role's agents and then deletes the row. It is not
+// a settings answer: nothing that serves the console, the wizard or the
+// reconcile pass goes through it.
+type PendingLLMKey struct {
+	Role  string
+	Field string
+	Value string
+}
+
+// PendingLLMKeys reads the key rows an older plugin left behind, in the
+// registry's role and field order. A row whose value is empty is not pending:
+// there is no key to forward, and the migration deletes it with the rest.
+func (s *Store) PendingLLMKeys(ctx context.Context) ([]PendingLLMKey, error) {
+	var out []PendingLLMKey
+	for _, role := range Roles {
+		for _, field := range llmKeyFields {
+			const q = `SELECT value FROM settings WHERE role = ? AND field = ?;`
+			var value string
+			switch err := s.db.QueryRowContext(ctx, q, string(role), field).Scan(&value); {
+			case errors.Is(err, sql.ErrNoRows):
+				continue
+			case err != nil:
+				return nil, fmt.Errorf("settings: cannot read %s.%s: %w", role, field, err)
+			}
+			out = append(out, PendingLLMKey{Role: string(role), Field: field, Value: value})
+		}
+	}
+	return out, nil
+}
+
+// DeleteLLMKeys removes the named key rows. The migration calls it only for a
+// key it has forwarded (or one there was nowhere to forward — a role with no
+// agent); a key whose forward the hub refused keeps its row and is retried on
+// the next start, because until it lands, the row is the only copy there is.
+func (s *Store) DeleteLLMKeys(ctx context.Context, keys []PendingLLMKey) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	const q = `DELETE FROM settings WHERE role = ? AND field = ?;`
+	for _, k := range keys {
+		if !isLLMKeyField(k.Field) {
+			return fmt.Errorf("settings: %q is not a provider key field", k.Field)
+		}
+		if _, err := s.db.ExecContext(ctx, q, k.Role, k.Field); err != nil {
+			return fmt.Errorf("settings: cannot delete %s.%s: %w", k.Role, k.Field, err)
+		}
+	}
+	return nil
 }
 
 // Adopted names one (role, field) the upgrade pass moved onto the current
@@ -759,7 +833,12 @@ type Adopted struct {
 // on an upgrade would erase the very signal that says “new version available”.
 // It returns the rows that moved, in the registry's order.
 func (s *Store) AdoptDefaults(ctx context.Context) ([]Adopted, error) {
-	const q = `SELECT role, field FROM settings WHERE dirty = 0 AND default_version <> ?;`
+	// A key row is never adopted: its value is a stored key the upgrade
+	// migration forwards onto the agents before it deletes the row, and
+	// overwriting it with the empty default here would destroy the only copy
+	// before anything had been forwarded.
+	const q = `SELECT role, field FROM settings WHERE dirty = 0 AND default_version <> ?
+		AND field NOT IN ('llmCustomKey', 'llmOpenAIKey', 'llmAnthropicKey', 'llmGoogleKey');`
 	rows, err := s.db.QueryContext(ctx, q, PluginVersion())
 	if err != nil {
 		return nil, fmt.Errorf("settings: cannot read stale defaults: %w", err)

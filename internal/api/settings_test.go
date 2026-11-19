@@ -27,7 +27,7 @@ func newSettingsAPI(t *testing.T) (http.Handler, *settings.Store) {
 		t.Fatalf("settings.Open: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	return NewSettings(&hub.Fake{}, s, nil), s
+	return NewSettings(&hub.Fake{}, s, nil, nil), s
 }
 
 // settingsRequest builds a settings request as the hub proxy sends it: a
@@ -276,6 +276,12 @@ type recordingPass struct {
 	err      error
 	checks   []reconcile.LLMCheck
 	checkErr error
+
+	// pushes records the keys the route handed to the engine, in the order it
+	// asked — the route's half of the key contract is "a typed key is a write
+	// onto the role's agents, and only that". pushErr is what that write answers.
+	pushes  []string
+	pushErr error
 }
 
 func (r *recordingPass) Pass(ctx context.Context, scope reconcile.Scope) (reconcile.Summary, error) {
@@ -285,6 +291,45 @@ func (r *recordingPass) Pass(ctx context.Context, scope reconcile.Scope) (reconc
 
 func (r *recordingPass) CheckLLMs(ctx context.Context) ([]reconcile.LLMCheck, error) {
 	return r.checks, r.checkErr
+}
+
+func (r *recordingPass) PushLLMKey(ctx context.Context, role, provider, key string) error {
+	r.pushes = append(r.pushes, role+"/"+provider+"/"+key)
+	return r.pushErr
+}
+
+// fakeInstalls is the install store as the settings route reads it: which roles
+// have an agent the hub holds a secret for. A key typed for a role outside that
+// set has nowhere to go, and the route says so per field.
+type fakeInstalls struct {
+	list []setup.Install
+	err  error
+}
+
+func (f fakeInstalls) List(context.Context) ([]setup.Install, error) {
+	return f.list, f.err
+}
+
+// installsOf is the one-line shape the tests write: one install row holding an
+// agent for each named role.
+func installsOf(roles ...string) installsReader {
+	in := setup.Install{Slug: "acme", LayoutVersion: setup.LayoutManagedAgents, Roles: map[setup.Role]setup.RoleState{}}
+	for _, r := range roles {
+		in.Roles[setup.Role(r)] = setup.RoleState{AgentID: "agent-" + r}
+	}
+	return fakeInstalls{list: []setup.Install{in}}
+}
+
+// decodedFields reads the refused-field list out of an answer, GET or PUT.
+func decodedFields(t *testing.T, body string) []settings.FieldError {
+	t.Helper()
+	var out struct {
+		Fields []settings.FieldError `json:"fields"`
+	}
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("decode fields: %v\nbody: %s", err, body)
+	}
+	return out.Fields
 }
 
 // newSettingsAPIWithPass serves the settings routes over a real settings store
@@ -300,7 +345,7 @@ func newSettingsAPIWithPass(t *testing.T, rec passRunner) (http.Handler, *record
 	if !ok {
 		t.Fatalf("test bug: not a recordingPass")
 	}
-	return NewSettings(&hub.Fake{}, s, rec), r
+	return NewSettings(&hub.Fake{}, s, rec, installsOf(string(setup.RoleDeveloper), string(setup.RoleRefiner), string(setup.RoleReviewer))), r
 }
 
 // putSettings saves one batch and answers the status code.
@@ -311,32 +356,162 @@ func putSettings(t *testing.T, api http.Handler, body string) int {
 	return w.Code
 }
 
-// TestSettingsGETNeverServesTheCustomKey is the route's half of the key's
-// contract: the store holds it, and every served answer — the GET and the PUT's
-// echo — carries the row empty, dirty flag and all, so the console can tell a
-// stored key from none without ever seeing it.
-func TestSettingsGETNeverServesTheCustomKey(t *testing.T) {
-	api, _ := newSettingsAPI(t)
+// TestSettingsKeyIsNeverServedAndGoesStraightToTheAgents is the route's half of
+// the key's contract now: a typed key is written onto the role's agents and the
+// plugin keeps no copy — the PUT's echo and the GET both answer the row empty,
+// and the row never reads as edited, because nothing here is set.
+func TestSettingsKeyIsNeverServedAndGoesStraightToTheAgents(t *testing.T) {
+	rec := &recordingPass{}
+	api, _ := newSettingsAPIWithPass(t, rec)
 
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, settingsRequest(t, http.MethodPut,
-		`{"settings":[{"role":"developer","field":"llmCustomKey","value":"sk-secret"}]}`))
+	// The role runs on the custom provider, so the key has a block to land in —
+	// a key for a provider the role does not run on is its own test.
+	api.ServeHTTP(w, settingsRequest(t, http.MethodPut, `{"settings":[
+		{"role":"developer","field":"llmProvider","value":"custom"},
+		{"role":"developer","field":"llmCustomUrl","value":"http://gw.local/v1"},
+		{"role":"developer","field":"llmCustomKey","value":"sk-secret"}]}`))
 	if w.Code != http.StatusOK {
 		t.Fatalf("PUT status = %d, want 200 (body %s)", w.Code, w.Body)
 	}
+	if len(rec.pushes) != 1 || rec.pushes[0] != "developer/custom/sk-secret" {
+		t.Errorf("pushes = %v, want the key written onto developer's agents", rec.pushes)
+	}
 	set, _ := settingIn(decodedSettings(t, w.Body.String()), "developer", settings.FieldLLMCustomKey)
-	if set.Value != "" || !set.Dirty {
-		t.Errorf("PUT echo: value = %q, dirty = %v, want empty and dirty", set.Value, set.Dirty)
+	if set.Value != "" || set.Dirty {
+		t.Errorf("PUT echo: value = %q, dirty = %v, want empty and unedited", set.Value, set.Dirty)
+	}
+	if strings.Contains(w.Body.String(), "sk-secret") {
+		t.Errorf("PUT body carries the key it was handed")
 	}
 
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, settingsRequest(t, http.MethodGet, ""))
 	if strings.Contains(w.Body.String(), "sk-secret") {
-		t.Errorf("GET body carries the stored key")
+		t.Errorf("GET body carries a key the plugin was told to keep no copy of")
 	}
 	set, _ = settingIn(decodedSettings(t, w.Body.String()), "developer", settings.FieldLLMCustomKey)
-	if set.Value != "" || !set.Dirty {
-		t.Errorf("GET: value = %q, dirty = %v, want empty and dirty", set.Value, set.Dirty)
+	if set.Value != "" || set.Dirty {
+		t.Errorf("GET: value = %q, dirty = %v, want empty and unedited", set.Value, set.Dirty)
+	}
+}
+
+// TestSettingsPUTRefusesAKeyForARoleWithNoAgent is the per-field refusal: the
+// agent is the key's only home, so a key for a role nobody installed has
+// nowhere to go — but that is one field's problem, not the batch's. The rest of
+// the batch saves and reconciles as it always did; the key comes back named,
+// with the wizard as the way out. (Refusing the whole batch is what made a
+// Settings page unusable before the first install.)
+func TestSettingsPUTRefusesAKeyForARoleWithNoAgent(t *testing.T) {
+	s, err := settings.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("settings.Open: %v", err)
+	}
+	t.Cleanup(func() { s.Close() })
+	rec := &recordingPass{}
+	api := NewSettings(&hub.Fake{}, s, rec, installsOf(string(setup.RoleDeveloper)))
+
+	// The refused role runs on the provider the key belongs to, so the only
+	// reason to refuse it is the one this test is about: no agent installed.
+	if err := s.Save(context.Background(), []settings.Edit{
+		{Role: "reviewer", Field: settings.FieldLLMProvider, Value: setup.LLMProviderCustom},
+		{Role: "reviewer", Field: settings.FieldLLMCustomUrl, Value: "http://gw.local/v1"},
+	}); err != nil {
+		t.Fatalf("provider Save: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, settingsRequest(t, http.MethodPut, `{"settings":[
+		{"role":"reviewer","field":"llmCustomKey","value":"sk-secret"},
+		{"role":"reviewer","field":"llmModel","value":"gpt-x"}]}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, want 200 — the batch saved, the key did not (body %s)", w.Code, w.Body)
+	}
+	fields := decodedFields(t, w.Body.String())
+	if len(fields) != 1 || fields[0].Field != settings.FieldLLMCustomKey || fields[0].Role != "reviewer" {
+		t.Fatalf("refused fields = %+v, want one naming reviewer.llmCustomKey", fields)
+	}
+	if !strings.Contains(fields[0].Error, "install") {
+		t.Errorf("refusal = %q, want it to name installing the role as the way out", fields[0].Error)
+	}
+	if strings.Contains(w.Body.String(), "sk-secret") {
+		t.Errorf("the refusal echoes the key")
+	}
+	if len(rec.pushes) != 0 {
+		t.Errorf("pushes = %v, want none — the key was refused", rec.pushes)
+	}
+
+	// The batch's other field saved: the refusal is the key's, not the PUT's.
+	if got, err := s.Effective(context.Background(), setup.RoleReviewer, settings.FieldLLMModel); err != nil || got != "gpt-x" {
+		t.Errorf("reviewer.llmModel = %q (%v), want the batch's other edit to have saved", got, err)
+	}
+}
+
+// TestSettingsPUTRefusesAKeyForAProviderTheRoleDoesNotRun keeps a key from
+// being saved into nothing: an agent on ollama-cloud has no custom-provider
+// block to hold a custom key, and a save that quietly dropped the key would
+// read as a save that stored one. Naming the provider the role runs on is the
+// fix the admin can act on; moving the role onto that provider in the same
+// batch is accepted, because the check reads the settings as they now are.
+func TestSettingsPUTRefusesAKeyForAProviderTheRoleDoesNotRun(t *testing.T) {
+	rec := &recordingPass{}
+	api, _ := newSettingsAPIWithPass(t, rec)
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, settingsRequest(t, http.MethodPut,
+		`{"settings":[{"role":"developer","field":"llmCustomKey","value":"sk-secret"}]}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, want 200 — the refusal is a field answer, not a bad batch (body %s)", w.Code, w.Body)
+	}
+	fields := decodedFields(t, w.Body.String())
+	if len(fields) != 1 || fields[0].Field != settings.FieldLLMCustomKey {
+		t.Fatalf("fields = %+v, want one naming llmCustomKey", fields)
+	}
+	if !strings.Contains(fields[0].Error, settings.DefaultLLMProvider) {
+		t.Errorf("refusal = %q, want it to name the provider the role runs on", fields[0].Error)
+	}
+	if len(rec.pushes) != 0 {
+		t.Errorf("pushes = %v, want none", rec.pushes)
+	}
+
+	// Same batch, provider moved too: the key now has an agent to hold it.
+	rec2 := &recordingPass{}
+	api2, _ := newSettingsAPIWithPass(t, rec2)
+	w = httptest.NewRecorder()
+	api2.ServeHTTP(w, settingsRequest(t, http.MethodPut, `{"settings":[
+		{"role":"developer","field":"llmProvider","value":"custom"},
+		{"role":"developer","field":"llmCustomUrl","value":"http://gw.local/v1"},
+		{"role":"developer","field":"llmCustomKey","value":"sk-secret"}]}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT with the provider: status = %d, want 200 (body %s)", w.Code, w.Body)
+	}
+	if len(rec2.pushes) != 1 || rec2.pushes[0] != "developer/custom/sk-secret" {
+		t.Errorf("pushes = %v, want the key written onto developer's agents", rec2.pushes)
+	}
+}
+
+// TestSettingsPUTReportsAKeyTheHubRefused is the difference between a failing
+// pass and a failing key: a pass that fails is logged, because the settings are
+// the PUT's promise and the next pass retries. A key that did not land has no
+// retry — the plugin kept no copy to retry from — so the field answers.
+func TestSettingsPUTReportsAKeyTheHubRefused(t *testing.T) {
+	rec := &recordingPass{pushErr: errors.New("hub refused the write")}
+	api, _ := newSettingsAPIWithPass(t, rec)
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, settingsRequest(t, http.MethodPut, `{"settings":[
+		{"role":"developer","field":"llmProvider","value":"custom"},
+		{"role":"developer","field":"llmCustomUrl","value":"http://gw.local/v1"},
+		{"role":"developer","field":"llmCustomKey","value":"sk-secret"}]}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, want 200 — the settings did save (body %s)", w.Code, w.Body)
+	}
+	fields := decodedFields(t, w.Body.String())
+	if len(fields) != 1 || fields[0].Field != settings.FieldLLMCustomKey {
+		t.Fatalf("fields = %+v, want one naming llmCustomKey", fields)
+	}
+	if !strings.Contains(fields[0].Error, "hub refused") {
+		t.Errorf("field error = %q, want the hub's reason", fields[0].Error)
 	}
 }
 
@@ -420,29 +595,45 @@ func TestSettingsPUTReconcilesOnlyWhatTheFieldsTouch(t *testing.T) {
 	}
 }
 
-// TestSettingsPUTReconcilesASavedKeyOfEveryProvider closes the gap the targeted
-// trigger leaves open: a key row is the only field that reaches an agent on its
-// own, with no provider or model in the batch to drag the agent scope in. Saving a
-// key of any of the four providers — the custom pair's or a vendor's — has to run
-// the pass that writes it to the agent, or the key sits in the settings until some
-// other field is edited or an admin presses "Check now".
+// TestSettingsPUTReconcilesASavedKeyOfEveryProvider keeps the targeted trigger
+// honest for the one field that reaches an agent on its own: saving a key of any
+// of the four providers runs the agent pass (the custom URL and the rest of the
+// agent's fields still ride it) and asks for the key to be written onto the
+// role's agents. A batch with no agent installed for the role is refused in the
+// key's own field before any of that — see
+// TestSettingsPUTRefusesAKeyForARoleWithNoAgent.
 func TestSettingsPUTReconcilesASavedKeyOfEveryProvider(t *testing.T) {
-	for _, field := range []string{
-		settings.FieldLLMCustomKey,
-		settings.FieldLLMOpenAIKey,
-		settings.FieldLLMAnthropicKey,
-		settings.FieldLLMGoogleKey,
+	for _, tt := range []struct{ field, provider string }{
+		{settings.FieldLLMCustomKey, setup.LLMProviderCustom},
+		{settings.FieldLLMOpenAIKey, setup.LLMProviderOpenAI},
+		{settings.FieldLLMAnthropicKey, setup.LLMProviderAnthropic},
+		{settings.FieldLLMGoogleKey, setup.LLMProviderGoogle},
 	} {
+		field, provider := tt.field, tt.provider
 		t.Run(field, func(t *testing.T) {
+			s, err := settings.Open(t.TempDir())
+			if err != nil {
+				t.Fatalf("settings.Open: %v", err)
+			}
+			t.Cleanup(func() { s.Close() })
 			rec := &recordingPass{}
-			api, _ := newSettingsAPIWithPass(t, rec)
+			api := NewSettings(&hub.Fake{}, s, rec, installsOf(string(setup.RoleDeveloper)))
 
-			body := fmt.Sprintf(`{"settings":[{"role":"developer","field":%q,"value":"sk-test"}]}`, field)
+			// The role runs on the provider whose key is saved, or the route
+			// refuses the key as one with no block to hold it — that rule is its
+			// own test.
+			body := fmt.Sprintf(`{"settings":[{"role":"developer","field":"llmProvider","value":%q},{"role":"developer","field":%q,"value":"sk-test"}]}`, provider, field)
+			if provider == setup.LLMProviderCustom {
+				body = fmt.Sprintf(`{"settings":[{"role":"developer","field":"llmProvider","value":"custom"},{"role":"developer","field":"llmCustomUrl","value":"http://gw.local/v1"},{"role":"developer","field":%q,"value":"sk-test"}]}`, field)
+			}
 			if code := putSettings(t, api, body); code != http.StatusOK {
 				t.Fatalf("PUT %s: status %d, want 200", field, code)
 			}
-			if len(rec.scopes) != 1 || rec.scopes[0] != reconcile.ScopeAgent {
-				t.Errorf("saving %s: passes = %v, want one ScopeAgent pass", field, rec.scopes)
+			if len(rec.scopes) == 0 || rec.scopes[0]&reconcile.ScopeAgent == 0 {
+				t.Errorf("saving %s: passes = %v, want an agent pass", field, rec.scopes)
+			}
+			if len(rec.pushes) != 1 || rec.pushes[0] != "developer/"+provider+"/sk-test" {
+				t.Fatalf("saving %s: pushes = %v, want the key written onto the agents", field, rec.pushes)
 			}
 		})
 	}

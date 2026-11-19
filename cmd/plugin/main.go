@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/reconcile"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/server"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/settings"
+	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/setup"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/skill"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/store"
 )
@@ -203,7 +205,7 @@ func run() error {
 	setupAPI := setupService.Handler()
 	// The role settings API: the admin's values for every install, read and
 	// edited here; a saved PUT reconciles the resources the saved fields touch.
-	settingsAPI := api.NewSettings(hubClient, settingsStore, reconciler)
+	settingsAPI := api.NewSettings(hubClient, settingsStore, reconciler, installStore)
 	combinedAPI := api.NewAPI(workAPI, setupAPI, settingsAPI)
 
 	srv := &http.Server{
@@ -249,6 +251,26 @@ func run() error {
 		serveErr <- nil
 	}()
 
+	// The provider-key migration (the upgrade's other half): an older plugin
+	// stored the four LLM provider keys in the settings table. Their home is the
+	// hub's per-agent secret now, so each stored key is forwarded onto the
+	// role's agents once — while the row is still the authoritative copy — and
+	// the row is deleted behind it. A key whose forward the hub refused keeps
+	// its row and is retried on the next start: until it lands, the row is the
+	// only copy there is. A key with no agent to hold it is dropped with a
+	// loud line — the admin enters it on the next install, or on Settings once
+	// the role is installed. It runs before the startup reconcile below, so no
+	// pass ever sees a settings table that still holds a secret.
+	if reconciler != nil {
+		forwardStoredLLMKeys(ctx, settingsStore, reconciler)
+	} else if pending, err := settingsStore.PendingLLMKeys(ctx); err != nil {
+		log.Printf("settings: reading stored provider keys: %v", err)
+	} else if len(pending) > 0 {
+		// No hub to forward to: the rows stay, and nothing serves them — every
+		// read of the settings table answers a key field empty.
+		log.Printf("settings: %d stored provider key(s) cannot be forwarded without a hub", len(pending))
+	}
+
 	// The startup reconcile, in a goroutine of its own: the plugin is serving
 	// — the hub can reach it — before the pass starts talking back. It adopts
 	// the new shipped defaults for fields nobody edited (the upgrade's
@@ -280,4 +302,77 @@ func run() error {
 		return fmt.Errorf("shutdown: %w", err)
 	}
 	return nil
+}
+
+// keyPusher is what the key migration needs of the reconcile engine: the one
+// write that puts an entered provider key onto a role's agents.
+type keyPusher interface {
+	PushLLMKey(ctx context.Context, role, provider, key string) error
+}
+
+// forwardStoredLLMKeys moves the provider keys an older plugin stored in the
+// settings table onto the role's agents, and deletes the rows behind them.
+//
+// The order is the whole point: the row is forwarded while it still holds the
+// authoritative value, and only a key that reached the hub (or one there was
+// nowhere to put — a role with no installed agent) is deleted. A key the hub
+// refused keeps its row and is retried on the next start, because until it
+// lands, the row is the only copy there is. An empty row is a key nobody ever
+// typed: deleted with the rest.
+func forwardStoredLLMKeys(ctx context.Context, st *settings.Store, rec keyPusher) {
+	pending, err := st.PendingLLMKeys(ctx)
+	if err != nil {
+		log.Printf("settings: reading stored provider keys: %v", err)
+		return
+	}
+	if len(pending) == 0 {
+		return
+	}
+
+	var done []settings.PendingLLMKey
+	for _, k := range pending {
+		if strings.TrimSpace(k.Value) == "" {
+			done = append(done, k)
+			continue
+		}
+		provider := llmProviderForKeyField(k.Field)
+		if provider == "" {
+			// Not a provider this plugin holds a key for: nothing to forward.
+			done = append(done, k)
+			continue
+		}
+		if err := rec.PushLLMKey(ctx, k.Role, provider, k.Value); err != nil {
+			if strings.Contains(err.Error(), "no installed agent") {
+				// Nowhere honest to put it, and holding the row forever would
+				// keep the plaintext on the volume for a key no agent will use.
+				log.Printf("settings: stored %s key for role %s has no installed agent to hold it: dropped, enter it again on the next install or on Settings once the role is installed", k.Field, k.Role)
+				done = append(done, k)
+				continue
+			}
+			log.Printf("settings: forwarding the stored %s key for role %s: %v: kept for the next start", k.Field, k.Role, err)
+			continue
+		}
+		log.Printf("settings: forwarded the stored %s key for role %s onto the role's agents", k.Field, k.Role)
+		done = append(done, k)
+	}
+
+	if err := st.DeleteLLMKeys(ctx, done); err != nil {
+		log.Printf("settings: deleting forwarded provider keys: %v", err)
+	}
+}
+
+// llmProviderForKeyField is the provider a stored key row belongs to — the
+// inverse of setup.LLMKeyFieldOf.
+func llmProviderForKeyField(field string) string {
+	switch field {
+	case settings.FieldLLMCustomKey:
+		return setup.LLMProviderCustom
+	case settings.FieldLLMOpenAIKey:
+		return setup.LLMProviderOpenAI
+	case settings.FieldLLMAnthropicKey:
+		return setup.LLMProviderAnthropic
+	case settings.FieldLLMGoogleKey:
+		return setup.LLMProviderGoogle
+	}
+	return ""
 }

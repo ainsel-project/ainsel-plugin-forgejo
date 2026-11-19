@@ -10,7 +10,7 @@ grants that decide what the plugin may do.
 |---|---|---|---|
 | **Forgejo site-admin token** | the wizard, on the run that creates (or removes) things | nowhere — used once during that run and dropped | No. It never reaches AInsel and never reaches the install row. |
 | **The three bot tokens** | minted by the plugin, one per bot | their role image's environment, as `FORGEJO_TOKEN` | No. Never displayed, never kept. |
-| **The LLM keys** | the agent create, per role | dropped — with one exception, below | No, with one exception. |
+| **The LLM keys** | the role's agents, per role | the hub's per-agent secret — never the plugin | No. |
 | **The webhook secret** | created by AInsel with the connector, handed straight to Forgejo in the same flow | AInsel's secret for the connector | No. |
 
 ### The site-admin token
@@ -32,19 +32,30 @@ admin token is the clean path.
 
 ### The LLM keys
 
-One per role, sent with the agent create and dropped. The four provider key rows
-(custom provider, OpenAI, Anthropic, Google Gemini) are **write-mostly**: the
-settings API never serves a key back, saving an empty value keeps what is stored, and
-**Reset** is what clears it. The row's "edited" tag is what tells you a key is
-there.
+One per role. The four provider key rows (custom provider, OpenAI, Anthropic, Google
+Gemini) are **write-only**: typing a key hands it to the hub, which stores it as the
+per-agent secret of that role's agents, and the settings API never serves a key back.
+The plugin keeps no copy — not in the settings table, not on the install row, which
+carries only the key's **fingerprint** so a re-apply does not write the same key again.
 
-The exception is the **custom provider's key**: a role on the `custom` provider keeps
-its key in the plugin's settings table — the only secret the table holds — because it
-has to be re-applied to the agent on a later edit or reconcile. A vendor key, by
-contrast, is handed to the hub, which holds it on the agent; the plugin records only
-its fingerprint on the install row.
+What that means on the Settings page: a key row always starts empty and never reads as
+edited (there is nothing here to have edited), saving it empty says nothing at all, and
+there is **no reset** — the hub has no way to clear an agent's key, so a new key typed
+over the old one is the only write a key row makes.
 
-A stored key of a provider the role does not name is kept and never sent.
+A key is accepted only for a role that has an installed agent to hold it. A role with no
+agent is refused **that field** — the rest of the batch saves as it stood, because a
+refusal that took the whole batch with it would throw away edits that had nothing to do
+with the key.
+
+The wizard's Roles step is the one place a key can be given before those agents exist:
+its optional **Provider key** field rides with the agent create. For a provider that
+holds no key (`ollama-cloud`, `opencode`, `alibaba-cloud`) the plan drops it.
+
+An older version kept a key in the plugin's settings table. On startup the plugin
+forwards any such row to the role's agents and deletes it once the hub has taken it; a
+row the hub refused stays for the next start, because until the key lands the row is the
+only copy there is.
 
 ### The webhook secret
 
@@ -89,8 +100,9 @@ incomplete; make them through the wizard.
 - Nothing a reader can read comes back out of the settings API — keys are masked in
   every answer.
 - The install row holds ids, logins, labels, tool sets and timestamps. No secret.
-- The SQLite file under `/data` holds settings (including a custom provider key if a
-  role uses one) and nothing else: treat it as a secret-bearing volume.
+- The SQLite file under `/data` holds settings and nothing else. It no longer holds a
+  provider key: an older version's key row is forwarded to the role's agents and
+  deleted at startup, so a fresh install's file carries no secret at all.
 - Removing an install without an admin token leaves a checklist rather than a
   half-deleted state, and keeps the install row so the retry can finish the job.
 

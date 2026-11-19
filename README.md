@@ -55,11 +55,12 @@ Four credentials pass through the wizard, and none of them is stored, logged or 
 
 - **The Forgejo site-admin token** — a site administrator's personal access token. It is used once, during the run that creates (or removes) the accounts, and then dropped. The wizard needs it to check the token, create the three bot users, create their teams, mint their tokens and write the organisation's webhook. It never reaches AInsel and never reaches the install row.
 - **The bot tokens** — minted by the plugin, one per bot, with the scopes `write:issue`, `write:repository`, `read:user`, `read:organization`. Each goes straight into its role image's environment as `FORGEJO_TOKEN`. They are never shown and never kept.
-- **The LLM keys** — one per role, sent with the agent create and dropped. The one
-  exception is the custom provider's key: a role on the `custom` provider keeps its key
-  in the plugin's settings table (the only secret the table holds), so it can be re-applied
-  to the agent on a later edit or reconcile. It is write-mostly — the settings API never
-  serves it back, an empty save keeps what is stored, and a reset clears it.
+- **The LLM keys** — one per role, held by the hub as the per-agent secret of that
+  role's agents. The four provider key rows on the Settings page are write-only: the
+  settings API never serves a key back, an empty save says nothing, and there is no reset
+  — the hub has no way to clear an agent's key, so a new key typed over the old is the
+  only write a key row makes. The plugin keeps no copy; the install row carries only the
+  key's fingerprint, so a re-apply does not write the same key twice.
 - **The webhook secret** — created by AInsel with the connector and handed straight to Forgejo in the same flow. It is never displayed.
 
 **Plugin group access** is the other half. Every route of the setup API requires the plugin credential and a caller who is an AInsel site administrator; the background re-apply has no user behind it at all and runs on the identity the admin grants with `set_plugin_group_access` (chart value `plugin.groupAccess`). Without that grant for the install's group, the install would be created now and unreconcilable for ever, so the wizard blocks it up front.

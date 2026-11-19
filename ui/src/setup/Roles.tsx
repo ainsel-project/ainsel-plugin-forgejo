@@ -354,6 +354,26 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               placeholder={turnTimeoutMinutesFromMs(TURN_TIMEOUT_DEFAULT_MS[role])}
             />
           </Field>
+
+          {/* The provider key, optional in the same sense the working hours are: empty
+              sends nothing, the plan draws no op, and the agents keep the key they hold.
+              It is the one place a key can be given before the agents exist — the
+              settings page has no key row to type it into on a first install, because a
+              key's home is the hub, on the agent. The plugin keeps no copy: what the
+              admin types here goes onto the agents and is never answered back. */}
+          <Field
+            htmlFor={`roles-${role}-llm-key`}
+            label="Provider key"
+            hint="Optional. Used only when the role's provider holds one (Custom, OpenAI, Anthropic, Google); any other provider ignores it. The hub stores it on this role's agent and never shows it again. Leave empty to keep the key the agent holds."
+          >
+            <Input
+              id={`roles-${role}-llm-key`}
+              type="password"
+              value={roleData.llmKey ?? ""}
+              onChange={(e: any) => handleRoleChange(role, { llmKey: e.target.value })}
+              placeholder="(unchanged)"
+            />
+          </Field>
         </div>
 
         {/* Working hours are optional in the plainest sense the wizard has: unticked, it sends

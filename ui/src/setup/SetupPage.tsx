@@ -1,7 +1,7 @@
 import { Notice, Panel, usePluginContext } from "@ainsel/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { SetupStep, Input } from "./model";
+import type { SetupStep, Input, RoleInput } from "./model";
 import { newInput, nextStep, prevStep, TURN_TIMEOUT_DEFAULT_MS } from "./model";
 import { Installs } from "./Installs";
 import { Instance } from "./Instance";
@@ -262,12 +262,19 @@ export function SetupPage() {
         roles: input.roles,
       })) as ApplyResponse;
 
-      // Clear the secret out of the walk's state — through setState, on a new object, so no
-      // component still holding the previous input reads a field the apply emptied under it.
-      // The role LLM keys used to go with it; the wizard carries no keys any more.
+      // Clear the secrets out of the walk's state — through setState, on a new object, so
+      // no component still holding the previous input reads a field the apply emptied
+      // under it. The role provider keys go with the admin token: the hub has them now,
+      // on the agents, and nothing here can show them again.
       setInput({
         ...input,
         adminToken: "",
+        roles: Object.fromEntries(
+          (Object.entries(input.roles) as [string, RoleInput][]).map(([r, ri]) => [
+            r,
+            { ...ri, llmKey: "" },
+          ]),
+        ) as Input["roles"],
       });
 
       setApplyResult(response);

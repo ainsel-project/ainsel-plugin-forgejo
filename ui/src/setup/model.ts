@@ -28,6 +28,13 @@ export interface RoleInput {
   // minutes and converts (issue #61). Empty means the shipped default on a new
   // install and "keep what the install has" on an edit — never "reset".
   turnTimeoutMs?: string;
+  // llmKey is the optional provider key the admin may type for the role. The
+  // wizard holds no settings of its own — a key's home is the hub, on the role's
+  // agents — so this is the one place a key can be given before the agents exist.
+  // It is used only while the role's provider holds one (custom, OpenAI, Anthropic,
+  // Google); for any other provider the plan drops it. Empty says nothing at all:
+  // no op, no write, the agents keep the key they hold.
+  llmKey?: string;
 }
 
 export interface Input {

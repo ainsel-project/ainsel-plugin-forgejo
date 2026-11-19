@@ -185,15 +185,16 @@ describe("Edit Install (the walk from S0)", () => {
     });
   });
 
-  it("carries no LLM fields on the roles step at all", async () => {
-    // The wizard asked for a provider, a model and a key per role until the settings
-    // move: every agent is created from the settings store, so the walk has no secrets
-    // of that kind left to carry or clear.
+  it("carries no provider or model row on the roles step, and one optional key", async () => {
+    // The wizard asked for a provider and a model per role until the settings move:
+    // every agent is created from the settings store. The key is the one secret the
+    // walk carries again — it is the only place a key can be given before the agents
+    // exist, since the settings page refuses a key for a role nobody installed.
     const user = userEvent.setup();
     const container = await editAndWalkTo(user, "Configure the agents");
 
     await eachRolePanel(user, container, (panel, role) => {
-      expect(panel.querySelectorAll('[type="password"]'), `${role} has no key field`).toHaveLength(0);
+      expect(panel.querySelectorAll('[type="password"]'), `${role} carries one key row`).toHaveLength(1);
       expect(panel.textContent).not.toContain("LLM Provider");
       expect(panel.textContent).not.toContain("LLM Model");
     });

@@ -18,10 +18,11 @@ const FIELD_VALUES: Record<string, string> = {
   llmProvider: "ollama-cloud",
   llmModel: "llama3.3",
   // The custom pair: the URL is an ordinary text row; the key's answer is
-  // always empty — the server masks it, so the row shows nothing but its tag.
+  // always empty because the plugin keeps no key to answer with — its home is the
+  // hub, on the role's agents. So is every key row: never a value, never edited.
   llmCustomUrl: "",
   llmCustomKey: "",
-  // The vendor keys: same secret contract, the answer is always empty.
+  // The vendor keys: the same contract.
   llmOpenAIKey: "",
   // The OpenAI auth method: a dropdown row, and the shipped default is the
   // method the hub itself answers for an agent that never named one.
@@ -267,7 +268,7 @@ describe("SettingsPage (the admin's cards)", () => {
           {
             role: "refiner",
             field: "llmOpenAIAuthMethod",
-            error: "ChatGPT sign-in sends no API key (save an empty llmOpenAIKey to keep the stored key, or keep APIKey)",
+            error: "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
           },
         ],
       };
@@ -295,9 +296,8 @@ describe("SettingsPage (the admin's cards)", () => {
     expect(url.type).toBe("text");
     expect(url.value).toBe(""); // nothing ships a custom endpoint
 
-    // The key row: a password input, empty whatever the store holds — the
-    // answer never carries it — and tagged so the admin can tell a stored key
-    // from none.
+    // The key row: a password input that starts empty whatever the agents hold —
+    // the plugin keeps no key to answer with — and reads as an untouched field.
     const key = screen.getByLabelText("Custom provider key") as HTMLInputElement;
     expect(key.type).toBe("password");
     expect(key.value).toBe("");
@@ -305,19 +305,18 @@ describe("SettingsPage (the admin's cards)", () => {
   });
 
   it("renders each vendor provider key as a write-only password row", async () => {
-    // The three vendor keys share the custom key's contract: the answer never
-    // carries the value, so every row starts empty, and a stored one shows as
-    // an overridden row that still displays nothing.
-    mockSettingsGet({ "refiner.llmOpenAIKey": { value: "", dirty: true } });
+    // The three vendor keys share the custom key's contract: the plugin holds no
+    // key at all, so every row starts empty and none of them reads as edited —
+    // there is nothing here that an admin could have edited.
+    mockSettingsGet();
     await renderLoaded();
 
     for (const label of ["OpenAI key", "Anthropic key", "Google Gemini key"]) {
       const key = screen.getByLabelText(label) as HTMLInputElement;
       expect(key.type).toBe("password");
       expect(key.value).toBe("");
+      expect(within(rowOf(label)).getByText("Default")).toBeTruthy();
     }
-    expect(within(rowOf("OpenAI key")).getByText("Overridden")).toBeTruthy();
-    expect(within(rowOf("Anthropic key")).getByText("Default")).toBeTruthy();
   });
 
   it("sends a vendor key with the provider that uses it", async () => {
@@ -343,16 +342,17 @@ describe("SettingsPage (the admin's cards)", () => {
     });
   });
 
-  it("shows a stored key as an overridden row that still displays nothing", async () => {
-    // The shape a GET answers with when a key is stored: the row is dirty —
-    // that is how the admin knows a key is set — and its value is empty, because
-    // the server masks it.
+  it("never shows a key row as edited, whatever an older answer carried", async () => {
+    // The plugin keeps no key, so no key row is edited — not now, and not from a
+    // stale answer that still carries the dirty flag an older version set. The
+    // row's edited tag used to mean "a key is stored here"; nothing here stores
+    // a key any more, and a tag that could never be cleared would read as one.
     mockSettingsGet({ "refiner.llmCustomKey": { value: "", dirty: true } });
     await renderLoaded();
 
     const key = screen.getByLabelText("Custom provider key") as HTMLInputElement;
     expect(key.value).toBe("");
-    expect(within(rowOf("Custom provider key")).getByText("Overridden")).toBeTruthy();
+    expect(within(rowOf("Custom provider key")).getByText("Default")).toBeTruthy();
   });
 
   it("sends provider, URL and key together as one batch when the role moves to custom", async () => {
@@ -382,10 +382,11 @@ describe("SettingsPage (the admin's cards)", () => {
     });
   });
 
-  it("keeps a stored key when the key field is left empty", async () => {
-    // The admin edits the URL of a role already on custom and types no key:
-    // the save names the key field with an empty value, which the store reads
-    // as "keep what is stored" — clearing is what the row's reset does.
+  it("sends no key at all when the key field is left empty", async () => {
+    // The admin edits the URL of a role already on custom and types no key: the
+    // save does not name the key field, because an empty key says nothing — the
+    // agents keep the key they hold. There is no reset to clear it either; a new
+    // key typed over the old one is the only write a key row makes.
     mockSettingsGet({
       "refiner.llmProvider": { value: "custom", dirty: true, options: PROVIDER_OPTIONS },
       "refiner.llmCustomUrl": { value: "https://old.example.com/v1", dirty: true },
@@ -408,18 +409,39 @@ describe("SettingsPage (the admin's cards)", () => {
     ]);
   });
 
-  it("clears a stored key at the row's reset", async () => {
-    mockSettingsGet({ "refiner.llmCustomKey": { value: "", dirty: true } });
-    put.mockImplementation(async (path: string, body: any) => {
-      expect(path).toBe("/settings");
-      expect(body).toEqual({ settings: [{ role: "refiner", field: "llmCustomKey", reset: true }] });
-      return { settings: makeSettings() };
-    });
+  it("offers no reset on a key row, because there is nothing here to reset", async () => {
+    // A key row is never dirty, so it never carries the reset a dirty row shows:
+    // the hub has no way to clear an agent's key, and a reset that promised to
+    // would promise a write the hub cannot take.
+    mockSettingsGet();
     await renderLoaded();
 
-    fireEvent.click(rowButton("Custom provider key", "Reset to default"));
+    expect(within(rowOf("Custom provider key")).queryByRole("button", { name: /Reset/ })).toBeNull();
+    expect(put).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+  it("names the key row when a saved key did not reach the agents", async () => {
+    // The save itself landed — the settings are the PUT's promise — but the key
+    // is a write onto the role's agents, and one of them refused it. Nothing
+    // retries it: the plugin kept no copy to retry from, so the field says so.
+    mockSettingsGet();
+    put.mockImplementation(async (_path: string, body: any) => ({
+      settings: afterBatch(makeSettings(), body.settings),
+      fields: [
+        {
+          role: "refiner",
+          field: "llmCustomKey",
+          error: "the role runs on ollama-cloud, so a custom key has no agent to hold it",
+        },
+      ],
+    }));
+    await renderLoaded();
+
+    fireEvent.change(screen.getByLabelText("Custom provider key"), { target: { value: "sk-secret" } });
+    fireEvent.click(within(saveBar()).getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText(/no agent to hold it/)).toBeTruthy();
+    expect(put).toHaveBeenCalledTimes(1);
   });
 
   it("names the URL field when the backend refuses a custom provider without one", async () => {

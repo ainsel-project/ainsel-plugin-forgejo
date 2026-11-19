@@ -334,6 +334,89 @@ func (e Engine) Pass(ctx context.Context, scope Scope) (Summary, error) {
 	return *sum, nil
 }
 
+// PushLLMKey writes an entered provider key to every agent the plugin has
+// installed for a role, and to nothing else: the key's home is the hub's
+// per-agent secret, which is where the agent's runtime reads it from and where
+// the plugin's backups no longer reach. The write is the sparse one — an agent
+// update naming that provider's key and no other field — so the agent's model,
+// persona and grants are left exactly where they are.
+//
+// It fans out over installs because a role can be installed in several groups,
+// and each row names its own agent for it. The fan-out is not atomic: a hub
+// that refuses one write leaves that agent on the old key, and the error says
+// so rather than reporting the whole push as a success. An empty key writes
+// nothing — the hub has no way to clear a stored key — and a role with no
+// installed agent at all is refused, because there is nowhere honest to put
+// the key: the settings table keeps no copy to hold it back.
+//
+// A write that lands moves the install row's key fingerprint, so the wizard's
+// next plan sees the agent already holding this key and does not promise the
+// same write again. The key itself never appears in the log or in the error:
+// the hub's failure text is built from its own response, which does not echo
+// what it was handed.
+func (e Engine) PushLLMKey(ctx context.Context, role, provider, key string) error {
+	if key == "" {
+		return nil
+	}
+	field := setup.LLMKeyFieldOf(provider)
+	if field == "" {
+		return fmt.Errorf("provider %q has no plugin-held key", provider)
+	}
+	ctx = hub.WithBackground(ctx)
+
+	installs, err := e.Store.List(ctx)
+	if err != nil {
+		return fmt.Errorf("Store.List: %w", err)
+	}
+
+	var written, refused int
+	var detail []string
+	var touched []setup.Install
+	for _, in := range installs {
+		if in.LayoutVersion != setup.LayoutManagedAgents {
+			// A legacy row is awaiting the cutover and its resources are not
+			// this plugin's to write — the same rule the pass follows.
+			continue
+		}
+		st, ok := in.Roles[setup.Role(role)]
+		if !ok || st.AgentID == "" {
+			// This install has no agent for the role — nothing here to write, and
+			// no reason to say so: another row may well have one.
+			continue
+		}
+		update := hub.AgentUpdate{}
+		setLLMKeyField(&update, provider, &key)
+		if err := e.Hub.UpdateAgent(ctx, st.AgentID, update); err != nil {
+			refused++
+			detail = append(detail, fmt.Sprintf("%s: %v", in.Slug, err))
+			e.log(in.Slug, fmt.Sprintf("refused %s key write on agent %s: %v", provider, st.AgentID, err))
+			continue
+		}
+		st.SetLLMKeyHash(provider, setup.CustomKeyFingerprint(key))
+		in.Roles[setup.Role(role)] = st
+		touched = append(touched, in)
+		written++
+		e.log(in.Slug, fmt.Sprintf("stored the %s provider key on agent %s", provider, st.AgentID))
+	}
+
+	// The fingerprints the writes earned, written back whatever else happened:
+	// a key that reached an agent reached it, and the next start should not
+	// write it there twice.
+	for _, in := range touched {
+		if err := e.Store.Save(ctx, in); err != nil {
+			e.log(in.Slug, fmt.Sprintf("key stored on the agents but the row kept its old fingerprint: %v", err))
+		}
+	}
+
+	if written == 0 && refused == 0 {
+		return fmt.Errorf("role %q has no installed agent to hold the key", role)
+	}
+	if refused > 0 {
+		return fmt.Errorf("%d of %d agents kept their old key: %s", refused, written+refused, strings.Join(detail, "; "))
+	}
+	return nil
+}
+
 // Startup is the pass a plugin start runs after an upgrade: the settings first
 // (the winner rule — a field nobody edited moves to what the new version
 // ships, a field an admin edited stays, down to the version stamped on it),
@@ -382,7 +465,12 @@ type desiredState struct {
 	//
 	// llmKeys doubles as the reading of the OpenAI auth method, which is not a
 	// key: it is the other half of how an openai role authenticates, and it is
-	// the half the hub can read back.
+	// the half the hub can read back. The four provider key rows are a
+	// pass-through in the settings store now (settings.isLLMKeyField): they no
+	// longer answer here at all, and a key reaches an agent through PushLLMKey —
+	// the wizard's create, or the upgrade migration. The pass keeps this
+	// reading, and the key write below, for a store that still answers with a
+	// key row: the values are written as they arrive and compared by nothing.
 	customURL map[setup.Role]string
 	llmKeys   map[setup.Role]setup.RoleLLM
 
@@ -787,11 +875,15 @@ func (e Engine) reconcileAgent(ctx context.Context, in *setup.Install, role setu
 	// The provider's key block, while the role runs on that provider. The custom
 	// URL is readable from the hub, so drift against the settings is corrected
 	// directly. A key cannot be read back, so its drift is seen through the row's
-	// fingerprint: a settings key the row does not record has not reached the
-	// agent, and the pass writes it — always as the settings hold it, never as the
-	// row's (stale) text. The correction line names the key's provider and its
+	// fingerprint: a key the row does not record has not reached the agent, and
+	// the pass writes it — always as the reading holds it, never as the row's
+	// (stale) text. The correction line names the key's provider and its
 	// presence, never its value (R4). Away from a provider the hub's block for it
 	// is inert and is left exactly where it is.
+	//
+	// Since the key rows left the settings table, the ordinary pass reads no key
+	// here and writes none: an entered key goes out through PushLLMKey, the only
+	// write that names a key with no copy kept behind it.
 	provider := want.llm[role].Provider
 	prevKeyHash := roleState.LLMKeyHashOf(provider)
 

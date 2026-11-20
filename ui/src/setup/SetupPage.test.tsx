@@ -433,6 +433,36 @@ describe("SetupPage (the wizard router)", () => {
     expect(setItem).not.toHaveBeenCalled();
   });
 
+  it("submits a typed provider key with the plan and the apply", async () => {
+    // The key's home is the hub, on the role's agent — and the wizard is the one
+    // place it can be given before that agent exists. The typed value rides both
+    // requests; the plugin keeps no copy of it afterwards.
+    const user = userEvent.setup();
+    post.mockImplementation(async (path: string) => {
+      if (path === "/setup/plan") return planFixture;
+      if (path === "/setup/apply") return applyFixture;
+      throw new Error(`unexpected POST ${path}`);
+    });
+
+    await walkToRoles(user);
+    await pickRuntimes(user);
+    fireEvent.change(document.querySelector("#roles-refiner-llm-key") as HTMLInputElement, {
+      target: { value: "sk-walk" },
+    });
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("button", { name: /^Apply/ });
+
+    const planned = post.mock.calls.find((c) => c[0] === "/setup/plan")?.[1] as any;
+    expect(planned.roles.refiner.llmKey).toBe("sk-walk");
+
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+    await screen.findByText("Verify the connection");
+
+    const applied = post.mock.calls.find((c) => c[0] === "/setup/apply")?.[1] as any;
+    expect(applied.roles.refiner.llmKey).toBe("sk-walk");
+  });
+
   it("after apply, secrets are cleared and Back leaves the walk", async () => {
     // An apply that worked made an install, so the walk is over. Back on S7 returns to the
     // list that now holds a row for it, and the preview where a second Apply would sit is no

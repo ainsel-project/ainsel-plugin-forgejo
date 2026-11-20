@@ -291,6 +291,19 @@ export interface Setting {
 
 export interface SettingsResponse {
   settings: Setting[];
+  // Fields names a field that saved but did not reach the hub — today only a
+  // provider key, whose storage is a write onto the role's agents rather than a
+  // row here. It arrives on a successful save, because the save itself did
+  // land; a refused batch carries the same shape on the error's body.
+  fields?: FieldError[];
+}
+
+// FieldError is one field's refusal, named by role and field so the page can
+// put the message on the row rather than in a banner over the whole form.
+export interface FieldError {
+  role: string;
+  field: string;
+  error: string;
 }
 
 // SettingsEdit is one requested change: one field of one role, either an edit
@@ -357,9 +370,11 @@ export function fetchSettings(api: HttpClient): Promise<SettingsResponse> {
   return api.get<SettingsResponse>("/settings");
 }
 
-// putSettings applies a batch of edits or resets. It resolves with the full
-// set as it now stands; a refused batch throws with the named fields on the
-// error's body (the console's client puts the parsed body there).
+// putSettings applies a batch of edits or resets. It resolves with the full set
+// as it now stands — plus, in `fields`, any field that saved without reaching
+// the hub (a provider key whose agents refused the write). A refused batch
+// throws with the named fields on the error's body (the console's client puts
+// the parsed body there).
 export function putSettings(api: HttpClient, edits: SettingsEdit[]): Promise<SettingsResponse> {
   return api.put<SettingsResponse>("/settings", { settings: edits });
 }

@@ -2402,3 +2402,193 @@ func TestSetupOrphanPlanWithoutHubURLClaimsNoHooks(t *testing.T) {
 		t.Errorf("body = %s, want the users still named", body)
 	}
 }
+
+// wizardKeySettings is the settings reading the wizard builds its plan on, with
+// one role moved onto a provider that has a key: the wizard's own key box only
+// has somewhere to go once the role runs on a provider that holds one.
+type wizardKeySettings struct {
+	fakeSettings
+	role     setup.Role
+	provider string
+}
+
+func (w wizardKeySettings) All(ctx context.Context) ([]settings.Setting, error) {
+	out, err := w.fakeSettings.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i, s := range out {
+		if s.Role == string(w.role) && s.Field == settings.FieldLLMProvider {
+			out[i].Value = w.provider
+		}
+	}
+	return out, nil
+}
+
+// setupApplyRequest is the wizard's apply body: the shape the console posts, in
+// the shape the route decodes it.
+type setupApplyRequest struct {
+	Slug       string                         `json:"slug"`
+	GroupID    string                         `json:"groupId"`
+	BaseURL    string                         `json:"baseUrl"`
+	Org        string                         `json:"org"`
+	AdminToken string                         `json:"adminToken"`
+	Roles      map[setup.Role]setup.RoleInput `json:"roles"`
+}
+
+// defaultImageToolSet is what the fake hub hands back when an image's tools are
+// refreshed: every tool the shipped profiles name, disabled, as a fresh catalog
+// arrives.
+func defaultImageToolSet() []hub.ImageTool {
+	all := map[string]bool{}
+	for _, role := range []setup.Role{setup.RoleRefiner, setup.RoleDeveloper, setup.RoleReviewer} {
+		for _, tool := range content.DefaultTools(role) {
+			all[tool] = true
+		}
+	}
+	out := make([]hub.ImageTool, 0, len(all))
+	for tool := range all {
+		out = append(out, hub.ImageTool{Name: tool, Kind: "mcp"})
+	}
+	return out
+}
+
+// TestSetupApplyWritesTheWizardKeyOntoTheAgentAndKeepsNoCopy is the wizard's
+// half of the key contract: a key typed in the wizard reaches the agent the
+// wizard creates, as the hub's own per-agent secret — and nothing else. It is
+// not written to the install row (R4 names the install row as no place for a
+// key), and the settings store is never asked to hold it: the plugin keeps no
+// copy, which is the whole point of the move.
+func TestSetupApplyWritesTheWizardKeyOntoTheAgentAndKeepsNoCopy(t *testing.T) {
+	h := &hub.Fake{
+		PluginGroupsSeed:         []string{"g-1"},
+		Personas:                 []hub.Ref{},
+		Agents:                   []hub.Ref{},
+		Images:                   []hub.Ref{},
+		Connectors:               []hub.Ref{},
+		MCPServers:               []hub.MCPServer{},
+		SeedImages:               map[string]hub.Image{},
+		DefaultRefreshImageTools: defaultImageToolSet(),
+		NextConnector: hub.Connector{
+			Ref:                hub.Ref{ID: "c-1", Name: "c-1"},
+			WebhookEndpoint:    "https://hub.test/webhook",
+			WebhookSecretValue: "NEWSECRET-xyz",
+		},
+	}
+	fg := &forgejoStub{orgExists: true, adminIsAdmin: true, loginExists: map[string]bool{}, tokenToReturn: "BOTTOKEN-123"}
+	s := &fakeStore{installs: make(map[string]setup.Install)}
+
+	logBuf := new(bytes.Buffer)
+	old := log.Writer()
+	log.SetOutput(logBuf)
+	defer log.SetOutput(old)
+
+	api := NewSetup(h, fg.client(), s,
+		wizardKeySettings{role: setup.RoleDeveloper, provider: setup.LLMProviderAnthropic},
+		SetupConfig{ForgejoBaseURL: "https://git.test"})
+
+	body, _ := json.Marshal(setupApplyRequest{
+		Slug: "test", GroupID: "g-1", BaseURL: "https://git.test",
+		Org: "test-org", AdminToken: "ADMINTOKEN-xyz",
+		Roles: map[setup.Role]setup.RoleInput{
+			setup.RoleRefiner:   {Runtime: "python:3.11"},
+			setup.RoleDeveloper: {Runtime: "python:3.11", LLMKey: "sk-wizard"},
+			setup.RoleReviewer:  {Runtime: "python:3.11"},
+		},
+	})
+	req := httptest.NewRequest("POST", "/api/setup/apply", bytes.NewReader(body))
+	req.Header.Set("X-Ainsel-Credential", "test-cred")
+	req.Header.Set("X-Ainsel-Context", callerContextHeader(t, true))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200: %s", w.Code, w.Body.String())
+	}
+
+	var created *hub.AgentSpec
+	for i, a := range h.CreatedAgents {
+		if strings.Contains(a.Name, "developer") {
+			created = &h.CreatedAgents[i]
+		}
+	}
+	if created == nil {
+		t.Fatalf("no developer agent was created: %+v", h.CreatedAgents)
+	}
+	if created.AnthropicKey != "sk-wizard" {
+		t.Errorf("created agent anthropic key = %q, want the wizard's key", created.AnthropicKey)
+	}
+	for _, a := range h.CreatedAgents {
+		if a.Name == created.Name {
+			continue
+		}
+		if a.OpenAIKey != "" || a.AnthropicKey != "" || a.GoogleKey != "" || a.CustomKey != "" {
+			t.Errorf("%s: a role that typed no key was created with one: %+v", a.Name, a)
+		}
+	}
+
+	// The install row carries no key — only, at most, the fingerprint of what
+	// reached the agent.
+	row := s.installs["test"]
+	for role, st := range row.Roles {
+		if st.LLMKeyHashOf(setup.LLMProviderAnthropic) != "" && role != setup.RoleDeveloper {
+			t.Errorf("%s: the row records a key fingerprint for a role that typed none", role)
+		}
+	}
+	if strings.Contains(w.Body.String(), "sk-wizard") {
+		t.Errorf("the apply answer echoes the key")
+	}
+	if strings.Contains(logBuf.String(), "sk-wizard") {
+		t.Errorf("the log carries the key")
+	}
+}
+
+// TestSetupApplyDropsAWizardKeyForAProviderThatHoldsNone is the wizard key's
+// drop rule: a role on a keyless provider has no block to hold a key, and a key
+// saved for it would be a key with no agent — so the apply creates the agent
+// without one and says nothing, rather than storing a secret nothing will read.
+func TestSetupApplyDropsAWizardKeyForAProviderThatHoldsNone(t *testing.T) {
+	h := &hub.Fake{
+		PluginGroupsSeed:         []string{"g-1"},
+		Personas:                 []hub.Ref{},
+		Agents:                   []hub.Ref{},
+		Images:                   []hub.Ref{},
+		Connectors:               []hub.Ref{},
+		MCPServers:               []hub.MCPServer{},
+		SeedImages:               map[string]hub.Image{},
+		DefaultRefreshImageTools: defaultImageToolSet(),
+		NextConnector: hub.Connector{
+			Ref:                hub.Ref{ID: "c-1", Name: "c-1"},
+			WebhookEndpoint:    "https://hub.test/webhook",
+			WebhookSecretValue: "NEWSECRET-xyz",
+		},
+	}
+	fg := &forgejoStub{orgExists: true, adminIsAdmin: true, loginExists: map[string]bool{}, tokenToReturn: "BOTTOKEN-123"}
+	s := &fakeStore{installs: make(map[string]setup.Install)}
+
+	api := NewSetup(h, fg.client(), s, fakeSettings{}, SetupConfig{ForgejoBaseURL: "https://git.test"})
+
+	body, _ := json.Marshal(setupApplyRequest{
+		Slug: "test", GroupID: "g-1", BaseURL: "https://git.test",
+		Org: "test-org", AdminToken: "ADMINTOKEN-xyz",
+		Roles: map[setup.Role]setup.RoleInput{
+			setup.RoleRefiner:   {Runtime: "python:3.11"},
+			setup.RoleDeveloper: {Runtime: "python:3.11", LLMKey: "sk-nowhere"},
+			setup.RoleReviewer:  {Runtime: "python:3.11"},
+		},
+	})
+	req := httptest.NewRequest("POST", "/api/setup/apply", bytes.NewReader(body))
+	req.Header.Set("X-Ainsel-Credential", "test-cred")
+	req.Header.Set("X-Ainsel-Context", callerContextHeader(t, true))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200: %s", w.Code, w.Body.String())
+	}
+	for _, a := range h.CreatedAgents {
+		if a.OpenAIKey != "" || a.AnthropicKey != "" || a.GoogleKey != "" || a.CustomKey != "" {
+			t.Errorf("%s: created with a key the provider cannot hold: %+v", a.Name, a)
+		}
+	}
+}

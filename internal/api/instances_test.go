@@ -238,7 +238,7 @@ func TestNewAPIRoutesInstancesToSettings(t *testing.T) {
 	api := NewAPI(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "work", http.StatusTeapot) }),
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "setup", http.StatusTeapot) }),
-		NewSettings(&hub.Fake{}, s, nil),
+		NewSettings(&hub.Fake{}, s, nil, nil),
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/instances", nil)

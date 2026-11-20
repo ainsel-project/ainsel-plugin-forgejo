@@ -724,6 +724,37 @@ describe("Roles (S4)", () => {
     expect(container.textContent).toContain("Leave empty to keep the install's current value.");
   });
 
+  // The optional provider key: the one secret the walk carries, because it is the
+  // only place a key can be given before the agents exist.
+  it("offers an empty password row for the role's provider key", () => {
+    const { container } = renderRoles();
+    const field = container.querySelector("#roles-refiner-llm-key") as HTMLInputElement;
+    expect(field.type).toBe("password");
+    // Nothing here holds a key to show: the plugin keeps no copy, so the row always
+    // starts empty, on an edit as on a new install.
+    expect(field.value).toBe("");
+  });
+
+  it("writes a typed provider key back to the role", () => {
+    const { container, setInput } = renderRoles();
+    setInput.mockClear();
+    const field = container.querySelector("#roles-developer-llm-key") as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "sk-dev" } });
+    const next = setInput.mock.calls[0][0] as Input;
+    expect(next.roles.developer.llmKey).toBe("sk-dev");
+  });
+
+  it("sends no key when the row is left empty", () => {
+    // Empty is not a write: a row nobody typed in makes no edit at all, so the role's
+    // input carries no key field, the plan draws no op, and the agent keeps the key it
+    // holds — the same rule the working-hours row follows.
+    const { container, setInput } = renderRoles({ editing: true });
+    setInput.mockClear();
+    const field = container.querySelector("#roles-refiner-llm-key") as HTMLInputElement;
+    expect(field.value).toBe("");
+    expect(setInput).not.toHaveBeenCalled();
+  });
+
   it("names the shipped default next to the turn timeout on a new install", () => {
     const { container } = renderRoles();
     // The developer ships with the 2-hour cap; the refiner and reviewer with 1 hour.

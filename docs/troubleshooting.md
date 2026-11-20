@@ -49,7 +49,9 @@ The plan refuses before anything is written, and names the fix.
 | `role "…" may not use: <tools>` | An edited tool set crosses the guard rails. Every violating tool is named, so one fix is enough. |
 | A tool name the catalogue does not have | Refused rather than accepted: a name no MCP server provides is not an error at write time, it is a tool that never arrives. Check the spelling against what the forge MCP server advertises. |
 | `custom provider needs a URL (set llmCustomUrl in the same save)` | The custom provider's one hard rule — the URL has to come in the same save as the key. |
-| `ChatGPT sign-in sends no API key (save an empty llmOpenAIKey to keep the stored key, or keep api_key)` | The two OpenAI auth methods contradict each other. Pick one. |
+| `ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)` | The two OpenAI auth methods contradict each other. Pick one. |
+| `no installed agent to hold the key` (named on the key field, the rest of the save landing) | A key's home is the hub's secret on the role's agent, and this role has no agent yet. Install the role, then type the key — or give it on the wizard's Roles step, which is where a key goes before the agent exists. |
+| `the role runs on <provider>, so a <provider> key has no agent to hold it` | The key names a provider the role does not run. Move the role onto that provider in the same save, or drop the key. |
 
 ## An agent never answers
 

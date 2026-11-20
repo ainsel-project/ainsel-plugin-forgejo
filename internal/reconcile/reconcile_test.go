@@ -2476,8 +2476,11 @@ func TestPassCorrectsADriftedCustomURL(t *testing.T) {
 	if up.CustomURL == nil || *up.CustomURL != "https://llm.example/v1" {
 		t.Fatalf("CustomURL = %v, want the settings' URL set back", up.CustomURL)
 	}
-	if up.CustomKey == nil || *up.CustomKey != "sk-secret" {
-		t.Errorf("CustomKey = %v, want the settings' key to ride with the URL", up.CustomKey)
+	// The key row is inert: the store answers no key (settings.IsLLMKeyField), and
+	// a pass that wrote a key it could not read back would write it on every run.
+	// A key rides PushLLMKey, never a URL correction.
+	if up.CustomKey != nil {
+		t.Errorf("CustomKey = %q, want nil: a pass writes no key", *up.CustomKey)
 	}
 	found := false
 	for _, c := range sum.Updated {
@@ -2500,13 +2503,13 @@ func TestPassCorrectsADriftedCustomURL(t *testing.T) {
 	}
 }
 
-// TestPassRefreshesADriftedKeyWithoutURLDrift is the key rotation reaching the
-// agent on its own: the URL stands where the settings name it, so there is no
-// URL drift to ride — the row's fingerprint is what shows the settings' key has
-// not been written. The correction names the key's presence, never its value
-// (R4), and the row moves to the written key's fingerprint so the next pass
-// writes nothing.
-func TestPassRefreshesADriftedKeyWithoutURLDrift(t *testing.T) {
+// TestPassWritesNoKeyForADriftedKeyRow is the pass standing well clear of a key.
+// A key cannot be read back from the hub, so a pass holding a value to compare
+// could only write it blind — and the settings store keeps no key to hold: the row
+// is a pass-through, so it answers with nothing here. What a stored row from an
+// older version is worth is the startup migration's question, not the pass's: the
+// pass writes no key and leaves the row's fingerprint exactly where it was.
+func TestPassWritesNoKeyForADriftedKeyRow(t *testing.T) {
 	ctx := context.Background()
 	st, cleanup := tmpStore(t)
 	defer cleanup()
@@ -2540,46 +2543,28 @@ func TestPassRefreshesADriftedKeyWithoutURLDrift(t *testing.T) {
 		t.Fatalf("Pass: %v", err)
 	}
 
-	if len(f.UpdatedAgents) != 1 {
-		t.Fatalf("UpdatedAgents: got %d, want 1 — a drifted key is a write of its own", len(f.UpdatedAgents))
+	if len(f.UpdatedAgents) != 0 {
+		t.Fatalf("UpdatedAgents: got %d, want 0 — a key row is not a write, not once and not on a repeat", len(f.UpdatedAgents))
 	}
-	up := f.UpdatedAgents[0].Update
-	if up.CustomURL != nil {
-		t.Errorf("CustomURL = %v, want nil: the URL never moved", *up.CustomURL)
-	}
-	if up.CustomKey == nil || *up.CustomKey != "sk-rotated" {
-		t.Fatalf("CustomKey = %v, want the settings' rotated key", up.CustomKey)
-	}
-	found := false
 	for _, c := range sum.Updated {
-		if c.Field == "customKey" {
-			found = true
-			if strings.Contains(c.From, "sk-") || strings.Contains(c.To, "sk-") {
-				t.Errorf("correction %q -> %q spells a key", c.From, c.To)
-			}
+		if strings.Contains(c.Field, "Key") {
+			t.Errorf("summary names a key correction (%q): the pass writes none", c.Field)
 		}
 	}
-	if !found {
-		t.Errorf("summary does not name the customKey correction: %+v", sum.Updated)
-	}
 
-	// The row now records the written key: the same pass has nothing left.
-	f.UpdatedAgents = nil
-	engine2 := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
-	if _, err := engine2.Pass(ctx, ScopeAll); err != nil {
-		t.Fatalf("second Pass: %v", err)
-	}
-	if len(f.UpdatedAgents) != 0 {
-		t.Errorf("second pass wrote %d agents, want 0 — the row records the key it wrote", len(f.UpdatedAgents))
+	// And the row keeps the fingerprint it had: nothing was written, so nothing is
+	// recorded as written. A fingerprint the pass moved without a write would hide
+	// the key the migration still has to forward.
+	got := rowAfter(t, ctx, st, "app")
+	if h := got.Roles[setup.RoleRefiner].LLMKeyHashOf(setup.LLMProviderCustom); h != setup.CustomKeyFingerprint("sk-old") {
+		t.Errorf("custom key fingerprint = %q, want the row left on the fingerprint it had", h)
 	}
 }
 
-// TestPassRefreshesADriftedVendorKey is the vendor rotation reaching the agent
-// the same way: the row's fingerprint of that provider is what shows the
-// settings' key has not been written, the correction names the provider and the
-// key's presence and never its value (R4), and the row moves to the written
-// key's fingerprint so the next pass writes nothing.
-func TestPassRefreshesADriftedVendorKey(t *testing.T) {
+// TestPassWritesNoKeyForAVendorKeyRow is the same rule on a vendor block: the row
+// is inert, for the provider the role runs on and for one it does not. A key gets
+// to the agent through PushLLMKey, which names the key it writes and keeps no copy.
+func TestPassWritesNoKeyForAVendorKeyRow(t *testing.T) {
 	ctx := context.Background()
 	st, cleanup := tmpStore(t)
 	defer cleanup()
@@ -2613,40 +2598,18 @@ func TestPassRefreshesADriftedVendorKey(t *testing.T) {
 		t.Fatalf("Pass: %v", err)
 	}
 
-	if len(f.UpdatedAgents) != 1 {
-		t.Fatalf("UpdatedAgents: got %d, want 1 — a drifted key is a write of its own", len(f.UpdatedAgents))
+	if len(f.UpdatedAgents) != 0 {
+		t.Fatalf("UpdatedAgents: got %d, want 0 — a vendor key row is not a write either", len(f.UpdatedAgents))
 	}
-	up := f.UpdatedAgents[0].Update
-	if up.LLM != nil {
-		t.Errorf("llm written (%+v), want untouched: the agent already names openai/model-x", *up.LLM)
-	}
-	if up.OpenAIKey == nil || *up.OpenAIKey != "sk-rotated" {
-		t.Fatalf("OpenAIKey = %v, want the settings' rotated key", up.OpenAIKey)
-	}
-	if up.AnthropicKey != nil {
-		t.Errorf("AnthropicKey = %v, want nil: a key of a provider the role does not run on stays put", *up.AnthropicKey)
-	}
-	found := false
 	for _, c := range sum.Updated {
-		if c.Field == "openaiKey" {
-			found = true
-			if strings.Contains(c.From, "sk-") || strings.Contains(c.To, "sk-") {
-				t.Errorf("correction %q -> %q spells a key", c.From, c.To)
-			}
+		if strings.Contains(c.Field, "Key") {
+			t.Errorf("summary names a key correction (%q): the pass writes none", c.Field)
 		}
 	}
-	if !found {
-		t.Errorf("summary does not name the openaiKey correction: %+v", sum.Updated)
-	}
 
-	// The row now records the written key: the same pass has nothing left.
-	f.UpdatedAgents = nil
-	engine2 := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
-	if _, err := engine2.Pass(ctx, ScopeAll); err != nil {
-		t.Fatalf("second Pass: %v", err)
-	}
-	if len(f.UpdatedAgents) != 0 {
-		t.Errorf("second pass wrote %d agents, want 0 — the row records the key it wrote", len(f.UpdatedAgents))
+	got := rowAfter(t, ctx, st, "app")
+	if h := got.Roles[setup.RoleRefiner].LLMKeyHashOf(setup.LLMProviderOpenAI); h != setup.CustomKeyFingerprint("sk-old") {
+		t.Errorf("openai key fingerprint = %q, want the row left on the fingerprint it had", h)
 	}
 }
 
@@ -2763,10 +2726,11 @@ func TestPassMovesARoleOntoChatGPTSignIn(t *testing.T) {
 	}
 }
 
-// TestPassMovesARoleOffTheSignIn: the way back has to say so. The hub keeps the
-// method it holds on a write that names none, so an agent left on a sign-in while
-// the settings hold a key authenticates with neither — the pass names the method
-// and the key together.
+// TestPassMovesARoleOffTheSignIn: the way back corrects the method, and the method
+// only. The hub keeps the method it holds on a write that names none, so an agent
+// left on a sign-in while the role is meant to use a key authenticates with
+// neither — the pass names the method. The key is not its to carry: it has none,
+// and the key the admin saves goes out on the save itself, through PushLLMKey.
 func TestPassMovesARoleOffTheSignIn(t *testing.T) {
 	ctx := context.Background()
 	st, cleanup := tmpStore(t)
@@ -2807,7 +2771,203 @@ func TestPassMovesARoleOffTheSignIn(t *testing.T) {
 		t.Fatalf("OpenAIAuthMethod = %v, want %q — an empty one leaves the agent on the sign-in",
 			up.OpenAIAuthMethod, setup.LLMAuthMethodAPIKey)
 	}
-	if up.OpenAIKey == nil || *up.OpenAIKey != "sk-back" {
-		t.Fatalf("OpenAIKey = %v, want the settings' key", up.OpenAIKey)
+	// The key row beside the method is inert: the pass has no key to write, and a
+	// key it invented would be a key nobody entered.
+	if up.OpenAIKey != nil {
+		t.Fatalf("OpenAIKey = %q, want nil: the method moves alone, the key rides the save", *up.OpenAIKey)
 	}
+}
+
+// rowAfter reads the install row a pass left behind.
+func rowAfter(t *testing.T, ctx context.Context, st *store.Store, slug string) setup.Install {
+	t.Helper()
+	all, err := st.List(ctx)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, in := range all {
+		if in.Slug == slug {
+			return in
+		}
+	}
+	t.Fatalf("no install row for %q", slug)
+	return setup.Install{}
+}
+
+// --- PushLLMKey: the key's home is the hub, on the role's agents ---
+
+// pushRow is an install row holding an agent for one role — the shape a key
+// push is asked about.
+func pushRow(slug string, role setup.Role, agentID string) setup.Install {
+	return setup.Install{
+		Slug:          slug,
+		LayoutVersion: setup.LayoutManagedAgents,
+		GroupID:       "g-" + slug,
+		Roles:         map[setup.Role]setup.RoleState{role: {AgentID: agentID}},
+	}
+}
+
+// TestPushLLMKeyWritesEveryAgentOfTheRole is the fan-out: a role installed in
+// two groups has an agent in each, and the key has to reach both — a key that
+// landed on one and not the other is a role that answers on one install and
+// fails on the next. Each row earns the fingerprint of the key that reached its
+// agent, and a legacy row's agent is left alone: it is not this plugin's to
+// write.
+func TestPushLLMKeyWritesEveryAgentOfTheRole(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	for _, in := range []setup.Install{
+		pushRow("acme", setup.RoleDeveloper, "a-dev-acme"),
+		pushRow("other", setup.RoleDeveloper, "a-dev-other"),
+	} {
+		if err := st.Save(ctx, in); err != nil {
+			t.Fatalf("Save: %v", err)
+		}
+	}
+	f := &hub.Fake{}
+	engine := Engine{Hub: f, Store: st, Log: func(string, string) {}}
+
+	if err := engine.PushLLMKey(ctx, string(setup.RoleDeveloper), setup.LLMProviderAnthropic, "sk-secret"); err != nil {
+		t.Fatalf("PushLLMKey: %v", err)
+	}
+	if len(f.UpdatedAgents) != 2 {
+		t.Fatalf("updates = %d, want one per install holding the role", len(f.UpdatedAgents))
+	}
+	for _, u := range f.UpdatedAgents {
+		if u.Update.AnthropicKey == nil || *u.Update.AnthropicKey != "sk-secret" {
+			t.Errorf("%s: anthropic key = %v, want the entered key", u.ID, u.Update.AnthropicKey)
+		}
+		// The sparse write: nothing else named, so nothing else moves.
+		if u.Update.Name != nil || u.Update.LLM != nil || u.Update.PersonaID != nil ||
+			u.Update.ImageRef != nil || u.Update.EnabledTools != nil || u.Update.CustomKey != nil ||
+			u.Update.OpenAIKey != nil || u.Update.GoogleKey != nil {
+			t.Errorf("%s: the update named more than the key: %+v", u.ID, u.Update)
+		}
+	}
+	for _, slug := range []string{"acme", "other"} {
+		row, ok := storedRow(ctx, st, slug)
+		if !ok {
+			t.Fatalf("row %s gone", slug)
+		}
+		if got := row.Roles[setup.RoleDeveloper].LLMKeyHashOf(setup.LLMProviderAnthropic); got != setup.CustomKeyFingerprint("sk-secret") {
+			t.Errorf("%s: fingerprint = %q, want the key that reached the agent", slug, got)
+		}
+	}
+}
+
+// TestPushLLMKeyRefusesARoleWithNoAgent is the honest half: the settings table
+// keeps no copy, so a role with no installed agent has nowhere to hold a key,
+// and a save that pretended otherwise would promise a secret it cannot keep.
+func TestPushLLMKeyRefusesARoleWithNoAgent(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, pushRow("acme", setup.RoleRefiner, "a-ref")); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	f := &hub.Fake{}
+	engine := Engine{Hub: f, Store: st, Log: func(string, string) {}}
+
+	err := engine.PushLLMKey(ctx, string(setup.RoleDeveloper), setup.LLMProviderCustom, "sk-secret")
+	if err == nil {
+		t.Fatalf("PushLLMKey: want an error — no agent holds the key")
+	}
+	if !strings.Contains(err.Error(), "no installed agent") {
+		t.Errorf("error = %q, want it to say the role has no installed agent", err)
+	}
+	if len(f.UpdatedAgents) != 0 {
+		t.Errorf("updates = %d, want none", len(f.UpdatedAgents))
+	}
+}
+
+// TestPushLLMKeyWritesNothingForAnEmptyKey: an empty key is "keep what the
+// agents hold" — the hub has no way to clear a stored key, so an empty value
+// must not even ask.
+func TestPushLLMKeyWritesNothingForAnEmptyKey(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, pushRow("acme", setup.RoleDeveloper, "a-dev")); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	f := &hub.Fake{}
+	engine := Engine{Hub: f, Store: st, Log: func(string, string) {}}
+
+	if err := engine.PushLLMKey(ctx, string(setup.RoleDeveloper), setup.LLMProviderOpenAI, ""); err != nil {
+		t.Fatalf("PushLLMKey empty: %v", err)
+	}
+	if len(f.UpdatedAgents) != 0 {
+		t.Errorf("updates = %d, want none", len(f.UpdatedAgents))
+	}
+}
+
+// TestPushLLMKeyReportsAFailingInstallByNameAndNotByKey is the failure shape:
+// the fan-out is not atomic, so the error has to say which install kept its old
+// key — and say it without the key, which is the whole reason the key left the
+// settings table.
+func TestPushLLMKeyReportsAFailingInstallByNameAndNotByKey(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	for _, in := range []setup.Install{
+		pushRow("acme", setup.RoleDeveloper, "a-dev-acme"),
+		pushRow("broken", setup.RoleDeveloper, "a-dev-broken"),
+	} {
+		if err := st.Save(ctx, in); err != nil {
+			t.Fatalf("Save: %v", err)
+		}
+	}
+	f := &hub.Fake{}
+	engine := Engine{Hub: failingAgentHub{Fake: f, fail: "a-dev-broken"}, Store: st, Log: func(string, string) {}}
+
+	err := engine.PushLLMKey(ctx, string(setup.RoleDeveloper), setup.LLMProviderOpenAI, "sk-secret")
+	if err == nil {
+		t.Fatalf("PushLLMKey: want an error — one agent kept its old key")
+	}
+	if !strings.Contains(err.Error(), "broken") {
+		t.Errorf("error = %q, want it to name the install that refused", err)
+	}
+	if strings.Contains(err.Error(), "sk-secret") {
+		t.Errorf("error = %q, want it to name nothing but the install", err)
+	}
+	// The install that took the key keeps its fingerprint whatever the other did.
+	row, _ := storedRow(ctx, st, "acme")
+	if got := row.Roles[setup.RoleDeveloper].LLMKeyHashOf(setup.LLMProviderOpenAI); got != setup.CustomKeyFingerprint("sk-secret") {
+		t.Errorf("acme: fingerprint = %q, want the key that reached its agent", got)
+	}
+	row, _ = storedRow(ctx, st, "broken")
+	if got := row.Roles[setup.RoleDeveloper].LLMKeyHashOf(setup.LLMProviderOpenAI); got != "" {
+		t.Errorf("broken: fingerprint = %q, want nothing recorded for a write that failed", got)
+	}
+}
+
+// storedRow reads one install row back out of the store.
+func storedRow(ctx context.Context, st *store.Store, slug string) (setup.Install, bool) {
+	rows, err := st.List(ctx)
+	if err != nil {
+		panic(err)
+	}
+	for _, in := range rows {
+		if in.Slug == slug {
+			return in, true
+		}
+	}
+	return setup.Install{}, false
+}
+
+// failingAgentHub is a hub that refuses one named agent's update — the shape a
+// partial fan-out failure takes.
+type failingAgentHub struct {
+	*hub.Fake
+	fail string
+}
+
+var _ hub.Client = (*failingAgentHub)(nil)
+
+func (h failingAgentHub) UpdateAgent(ctx context.Context, id string, u hub.AgentUpdate) error {
+	if id == h.fail {
+		return errors.New("hub refused the write")
+	}
+	return h.Fake.UpdateAgent(ctx, id, u)
 }

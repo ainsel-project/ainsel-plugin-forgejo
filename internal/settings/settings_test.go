@@ -119,11 +119,16 @@ func TestSaveRoundTripAcrossReopen(t *testing.T) {
 				// The same rule for the other dropdown: only a listed method saves.
 				value = "ChatGPTSignIn"
 			}
+			if isLLMKeyField(field) {
+				// The key fields are a pass-through: a save carrying one writes
+				// no row, so the round trip has nothing to bring back. The
+				// pass-through's own contract is TestLLMKeysAreNotStored.
+				value = ""
+			}
 			if field == FieldLLMOpenAIKey {
 				// The one pair a batch cannot carry: the sign-in above sends no key,
 				// and Save refuses the two together (TestSaveRefusesSignInWithAKeyInThe
-				// SameBatch). The key row's own round trip is the key contract's — see
-				// TestVendorKeysFollowTheCustomKeyContract.
+				// SameBatch).
 				value = ""
 			}
 			edits = append(edits, Edit{Role: string(role), Field: field, Value: value})
@@ -152,10 +157,14 @@ func TestSaveRoundTripAcrossReopen(t *testing.T) {
 		if set.Value != want[k] {
 			t.Errorf("%s: value = %q…, want the edited value", k, truncate(set.Value))
 		}
-		if set.Field == FieldLLMOpenAIKey {
-			// The empty save this batch carried is "keep what is stored", not an
-			// edit — the row stays un-dirty on a store that never held a key. Its
-			// dirty round trip is the key contract's own test.
+		if isLLMKeyField(set.Field) {
+			// A pass-through never reads back and never reads as edited.
+			if set.Value != "" {
+				t.Errorf("%s: value = %q after a save that named a key, want empty", k, set.Value)
+			}
+			if set.Dirty {
+				t.Errorf("%s: dirty = true after a save that stores no key", k)
+			}
 			continue
 		}
 		if !set.Dirty {
@@ -589,169 +598,173 @@ func TestSaveRefusesEmptyingTheURLUnderACustomProvider(t *testing.T) {
 	}
 }
 
-// TestCustomKeyKeepsOnEmptySaveAndNeverReadsBackToTheConsole is the key's
-// whole contract: a save sets it, an empty save keeps it (the console can
-// never show it, so an empty field means "leave it alone"), a reset clears it,
-// and a served answer never carries it — MaskSecrets blanks the row while the
-// dirty flag still says a key is set.
-func TestCustomKeyKeepsOnEmptySaveAndNeverReadsBackToTheConsole(t *testing.T) {
-	s := openStore(t)
+// TestLLMKeysAreNotStored is the key fields' contract now: a save carrying a
+// key stores nothing, reads back nothing, and leaves no row — the key's home is
+// the hub's per-agent secret, and the plugin keeps no copy. An empty save and a
+// reset are equally inert: there is nothing here to keep and nothing to clear.
+func TestLLMKeysAreNotStored(t *testing.T) {
 	ctx := context.Background()
+	for _, field := range []string{FieldLLMCustomKey, FieldLLMOpenAIKey, FieldLLMAnthropicKey, FieldLLMGoogleKey} {
+		s := openStore(t)
 
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Value: "sk-secret"},
-	}); err != nil {
-		t.Fatalf("Save key: %v", err)
-	}
-	if got, err := s.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); err != nil || got != "sk-secret" {
-		t.Fatalf("Effective key = %q (%v), want sk-secret", got, err)
-	}
-
-	// An empty save keeps the stored key.
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Value: ""},
-	}); err != nil {
-		t.Fatalf("empty Save key: %v", err)
-	}
-	if got, _ := s.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); got != "sk-secret" {
-		t.Errorf("Effective key = %q after an empty save, want the stored key kept", got)
-	}
-
-	// The row reads as edited, but a served answer blanks the value — and the
-	// dirty flag survives the blanking, so the console can still say "set".
-	set := find(t, s, setup.RoleDeveloper, FieldLLMCustomKey)
-	if !set.Dirty {
-		t.Errorf("key row not dirty after an edit")
-	}
-	masked := false
-	rows := mustAll(t, s)
-	MaskSecrets(rows)
-	for _, r := range rows {
-		if r.Role != string(setup.RoleDeveloper) || r.Field != FieldLLMCustomKey {
-			continue
+		if err := s.Save(ctx, []Edit{
+			{Role: string(setup.RoleDeveloper), Field: field, Value: "sk-secret"},
+		}); err != nil {
+			t.Fatalf("%s: Save key: %v", field, err)
 		}
-		masked = true
-		if r.Value != "" {
-			t.Errorf("masked answer still carries the key %q", r.Value)
+		if got, err := s.Effective(ctx, setup.RoleDeveloper, field); err != nil || got != "" {
+			t.Errorf("%s: Effective = %q (%v), want empty — the store keeps no key", field, got, err)
 		}
-		if !r.Dirty {
-			t.Errorf("masked answer lost the dirty flag that says a key is set")
+		for _, r := range mustAll(t, s) {
+			if r.Role == string(setup.RoleDeveloper) && r.Field == field {
+				if r.Value != "" || r.Dirty {
+					t.Errorf("%s: served row = %q dirty=%v, want an empty unedited row", field, r.Value, r.Dirty)
+				}
+			}
 		}
-	}
-	if !masked {
-		t.Errorf("MaskSecrets saw no developer key row to mask")
-	}
+		if pending, err := s.PendingLLMKeys(ctx); err != nil || len(pending) != 0 {
+			t.Errorf("%s: PendingLLMKeys = %v (%v), want none — a save stores no key", field, pending, err)
+		}
 
-	// A reset is what clears it.
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Reset: true},
-	}); err != nil {
-		t.Fatalf("reset key: %v", err)
-	}
-	if got, _ := s.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); got != "" {
-		t.Errorf("Effective key = %q after a reset, want empty", got)
+		// An empty save and a reset store nothing either — and neither errors.
+		if err := s.Save(ctx, []Edit{
+			{Role: string(setup.RoleDeveloper), Field: field, Value: ""},
+		}); err != nil {
+			t.Fatalf("%s: empty Save: %v", field, err)
+		}
+		if err := s.Save(ctx, []Edit{
+			{Role: string(setup.RoleDeveloper), Field: field, Reset: true},
+		}); err != nil {
+			t.Fatalf("%s: reset Save: %v", field, err)
+		}
+		if got, _ := s.Effective(ctx, setup.RoleDeveloper, field); got != "" {
+			t.Errorf("%s: Effective = %q after an empty save and a reset, want empty", field, got)
+		}
 	}
 }
 
-// TestVendorKeysFollowTheCustomKeyContract is the three vendor key rows under
-// the rules the custom key has always had: a stored key reads back to the
-// apply, an empty save keeps it, the served answer never carries it, and a
-// reset is what clears it. The rules are set membership over the key fields, so
-// one subtest per field says the generalization holds.
-func TestVendorKeysFollowTheCustomKeyContract(t *testing.T) {
-	for _, field := range []string{FieldLLMOpenAIKey, FieldLLMAnthropicKey, FieldLLMGoogleKey} {
-		t.Run(field, func(t *testing.T) {
-			s := openStore(t)
-			ctx := context.Background()
+// TestLegacyKeyRowsAreNeitherServedNorEffective is the upgrade's first half: a
+// table an older plugin wrote still holds key rows, and no read of the settings
+// answers with one — not the console's registry (All), not the apply's or the
+// reconciler's reading (Effective). The value is only ever reachable through
+// the migration's own raw read.
+func TestLegacyKeyRowsAreNeitherServedNorEffective(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	ctx := context.Background()
+	if _, err := s.db.Exec(`INSERT INTO settings (role, field, value, dirty, default_version)
+		VALUES ('developer', 'llmCustomKey', 'sk-legacy', 1, 'v0.0.0')`); err != nil {
+		t.Fatalf("inserting a legacy key row: %v", err)
+	}
+	s.Close()
 
-			if err := s.Save(ctx, []Edit{
-				{Role: string(setup.RoleDeveloper), Field: field, Value: "sk-vendor"},
-			}); err != nil {
-				t.Fatalf("Save key: %v", err)
-			}
-			if got, err := s.Effective(ctx, setup.RoleDeveloper, field); err != nil || got != "sk-vendor" {
-				t.Fatalf("Effective key = %q (%v), want sk-vendor", got, err)
-			}
+	s2, err := Open(dir)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer s2.Close()
 
-			if err := s.Save(ctx, []Edit{
-				{Role: string(setup.RoleDeveloper), Field: field, Value: ""},
-			}); err != nil {
-				t.Fatalf("empty Save key: %v", err)
-			}
-			if got, _ := s.Effective(ctx, setup.RoleDeveloper, field); got != "sk-vendor" {
-				t.Errorf("Effective key = %q after an empty save, want the stored key kept", got)
-			}
+	if got, err := s2.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); err != nil || got != "" {
+		t.Errorf("Effective over a legacy key row = %q (%v), want empty", got, err)
+	}
+	for _, r := range mustAll(t, s2) {
+		if r.Field == FieldLLMCustomKey && r.Role == string(setup.RoleDeveloper) && r.Value != "" {
+			t.Errorf("All served the legacy key %q", r.Value)
+		}
+	}
+	MaskSecrets(mustAll(t, s2))
 
-			rows := mustAll(t, s)
-			MaskSecrets(rows)
-			masked := false
-			for _, r := range rows {
-				if r.Role != string(setup.RoleDeveloper) || r.Field != field {
-					continue
-				}
-				masked = true
-				if r.Value != "" {
-					t.Errorf("masked answer still carries the key %q", r.Value)
-				}
-				if !r.Dirty {
-					t.Errorf("masked answer lost the dirty flag that says a key is set")
-				}
-			}
-			if !masked {
-				t.Errorf("MaskSecrets saw no developer %s row to mask", field)
-			}
-
-			if err := s.Save(ctx, []Edit{
-				{Role: string(setup.RoleDeveloper), Field: field, Reset: true},
-			}); err != nil {
-				t.Fatalf("reset key: %v", err)
-			}
-			if got, _ := s.Effective(ctx, setup.RoleDeveloper, field); got != "" {
-				t.Errorf("Effective key = %q after a reset, want empty", got)
-			}
-		})
+	// The migration's read is the one place the stored value is reachable —
+	// and the delete behind it is what ends that.
+	pending, err := s2.PendingLLMKeys(ctx)
+	if err != nil {
+		t.Fatalf("PendingLLMKeys: %v", err)
+	}
+	if len(pending) != 1 || pending[0].Value != "sk-legacy" || pending[0].Role != "developer" {
+		t.Fatalf("PendingLLMKeys = %+v, want the one legacy row", pending)
+	}
+	if err := s2.DeleteLLMKeys(ctx, pending); err != nil {
+		t.Fatalf("DeleteLLMKeys: %v", err)
+	}
+	if pending, err := s2.PendingLLMKeys(ctx); err != nil || len(pending) != 0 {
+		t.Errorf("PendingLLMKeys after the delete = %v (%v), want none", pending, err)
 	}
 }
 
-// TestEmptyKeySaveOnAKeylessRowStaysUnedited is the edited tag's contract:
-// the console reads "edited" on the key row as "a key is stored", so a save
-// that stores nothing — an empty value over a row that holds no key — must not
-// flip the row to edited. Keeping a stored key keeps the tag; keeping nothing
-// keeps the row unedited.
-func TestEmptyKeySaveOnAKeylessRowStaysUnedited(t *testing.T) {
-	s := openStore(t)
+// TestDeleteLLMKeysRemovesOnlyWhatTheMigrationForwarded is the delete's
+// per-field-per-role rule: a key the hub refused keeps its row and is retried
+// on the next start, and a row for another role or field is never touched.
+func TestDeleteLLMKeysRemovesOnlyWhatTheMigrationForwarded(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
 	ctx := context.Background()
+	if _, err := s.db.Exec(`INSERT INTO settings (role, field, value, dirty, default_version) VALUES
+		('developer', 'llmCustomKey', 'sk-dev', 1, 'v0.0.0'),
+		('reviewer', 'llmCustomKey', 'sk-rev', 1, 'v0.0.0'),
+		('developer', 'llmOpenAIKey', 'sk-oai', 1, 'v0.0.0')`); err != nil {
+		t.Fatalf("inserting legacy key rows: %v", err)
+	}
+	s.Close()
 
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Value: ""},
-	}); err != nil {
-		t.Fatalf("empty Save key: %v", err)
+	s2, err := Open(dir)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
 	}
-	if got, _ := s.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); got != "" {
-		t.Errorf("Effective key = %q, want empty", got)
-	}
-	if set := find(t, s, setup.RoleDeveloper, FieldLLMCustomKey); set.Dirty {
-		t.Errorf("key row edited after an empty save with nothing stored — edited must mean a key is stored")
-	}
+	defer s2.Close()
 
-	// And after a reset, an empty save keeps the row unedited too.
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Value: "sk-secret"},
+	if err := s2.DeleteLLMKeys(ctx, []PendingLLMKey{
+		{Role: "developer", Field: FieldLLMCustomKey},
+		{Role: "developer", Field: FieldLLMOpenAIKey},
 	}); err != nil {
-		t.Fatalf("Save key: %v", err)
+		t.Fatalf("DeleteLLMKeys: %v", err)
 	}
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Reset: true},
-	}); err != nil {
-		t.Fatalf("reset key: %v", err)
+	pending, err := s2.PendingLLMKeys(ctx)
+	if err != nil {
+		t.Fatalf("PendingLLMKeys: %v", err)
 	}
-	if err := s.Save(ctx, []Edit{
-		{Role: string(setup.RoleDeveloper), Field: FieldLLMCustomKey, Value: ""},
-	}); err != nil {
-		t.Fatalf("empty Save after reset: %v", err)
+	if len(pending) != 1 || pending[0].Role != "reviewer" || pending[0].Value != "sk-rev" {
+		t.Errorf("PendingLLMKeys = %+v, want only the reviewer's row kept", pending)
 	}
-	if set := find(t, s, setup.RoleDeveloper, FieldLLMCustomKey); set.Dirty {
-		t.Errorf("key row edited after an empty save over a reset row, want the reset kept")
+}
+
+// TestAdoptDefaultsLeavesKeyRowsForTheMigration is the migration's second
+// half: the startup adoption re-adopts stale rows toward the shipped default,
+// and a stored key row is not its to move — the migration reads the row as the
+// upgrade stored it, and adoption must not blank the value before it forwards.
+func TestAdoptDefaultsLeavesKeyRowsForTheMigration(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	ctx := context.Background()
+	if _, err := s.db.Exec(`INSERT INTO settings (role, field, value, dirty, default_version)
+		VALUES ('developer', 'llmAnthropicKey', 'sk-legacy', 1, 'v0.0.0')`); err != nil {
+		t.Fatalf("inserting a legacy key row: %v", err)
+	}
+	s.Close()
+
+	s2, err := Open(dir)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer s2.Close()
+
+	if _, err := s2.AdoptDefaults(ctx); err != nil {
+		t.Fatalf("AdoptDefaults: %v", err)
+	}
+	pending, err := s2.PendingLLMKeys(ctx)
+	if err != nil {
+		t.Fatalf("PendingLLMKeys: %v", err)
+	}
+	if len(pending) != 1 || pending[0].Value != "sk-legacy" {
+		t.Errorf("PendingLLMKeys = %+v, want the key row untouched by adoption", pending)
 	}
 }
 
@@ -883,9 +896,9 @@ func TestAdoptDefaultsMovesUntouchedStaleRows(t *testing.T) {
 		t.Fatalf("AdoptDefaults: %v", err)
 	}
 
-	total := len(Roles) * len(Fields)
+	total := len(Roles)*len(Fields) - 4*len(Roles)
 	if len(adopted) != total-1 {
-		t.Fatalf("adopted %d rows, want %d (everything but the edited one)", len(adopted), total-1)
+		t.Fatalf("adopted %d rows, want %d (everything but the edited one, and but the key rows — those are the migration's, not adoption's)", len(adopted), total-1)
 	}
 	// The registry's order: the first entry is the first field of the first role.
 	if adopted[0].Role != string(Roles[0]) || adopted[0].Field != Fields[0] {
@@ -902,6 +915,11 @@ func TestAdoptDefaultsMovesUntouchedStaleRows(t *testing.T) {
 	for _, role := range Roles {
 		for _, field := range Fields {
 			if role == "refiner" && field == FieldLLMModel {
+				continue
+			}
+			if isLLMKeyField(field) {
+				// A stored key row is the migration's to read and delete, never
+				// adoption's to blank out before the forward.
 				continue
 			}
 			var value, version string

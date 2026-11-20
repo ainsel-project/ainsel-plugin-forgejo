@@ -80,9 +80,10 @@ type FieldSpec = {
   placeholder?: string;
   multiline?: boolean;
   mono?: boolean;
-  // secret marks a write-only field: the answer never carries its value, so
-  // the input starts empty, an empty save keeps what is stored, and a reset is
-  // what clears it. It renders as a password input.
+  // secret marks a write-only field: the plugin keeps no copy of its value, so
+  // the input always starts empty, an empty save says nothing, and the row never
+  // reads as edited — a typed value is written straight onto the role's agents.
+  // It renders as a password input.
   secret?: boolean;
 };
 
@@ -109,18 +110,20 @@ const GROUPS: { title: string; desc: string; fields: FieldSpec[] }[] = [
       {
         field: "llmCustomKey",
         label: "Custom provider key",
-        help: "Optional. Sent on save and never shown again — leave it empty to keep the stored key, reset the row to clear it.",
+        help: "Optional. The hub stores it on the role's agents and never shows it again — type a new key to replace it, leave it empty to keep what the agents hold. The role must be installed to hold one.",
         placeholder: "(unchanged)",
         mono: true,
         secret: true,
       },
       // One key row per vendor provider. Each is used only while the role's
-      // provider names it; the others are stored and never sent. All four key
-      // rows share the secret contract: the answer never carries the value.
+      // provider names it; the others have no block on the agent to hold them.
+      // All four key rows share the contract: the plugin stores none of them, so
+      // the answer is always empty and a typed value is written straight onto
+      // the role's agents.
       {
         field: "llmOpenAIKey",
         label: "OpenAI key",
-        help: "Used when the provider is OpenAI. Sent on save and never shown again — leave it empty to keep the stored key, reset the row to clear it.",
+        help: "Used when the provider is OpenAI. The hub stores it on the role's agents and never shows it again — type a new key to replace it, leave it empty to keep what the agents hold.",
         placeholder: "(unchanged)",
         mono: true,
         secret: true,
@@ -136,7 +139,7 @@ const GROUPS: { title: string; desc: string; fields: FieldSpec[] }[] = [
       {
         field: "llmAnthropicKey",
         label: "Anthropic key",
-        help: "Used when the provider is Anthropic. Sent on save and never shown again — leave it empty to keep the stored key, reset the row to clear it.",
+        help: "Used when the provider is Anthropic. The hub stores it on the role's agents and never shows it again — type a new key to replace it, leave it empty to keep what the agents hold.",
         placeholder: "(unchanged)",
         mono: true,
         secret: true,
@@ -144,7 +147,7 @@ const GROUPS: { title: string; desc: string; fields: FieldSpec[] }[] = [
       {
         field: "llmGoogleKey",
         label: "Google Gemini key",
-        help: "Used when the provider is Google Gemini. Sent on save and never shown again — leave it empty to keep the stored key, reset the row to clear it.",
+        help: "Used when the provider is Google Gemini. The hub stores it on the role's agents and never shows it again — type a new key to replace it, leave it empty to keep what the agents hold.",
         placeholder: "(unchanged)",
         mono: true,
         secret: true,
@@ -406,6 +409,21 @@ export function SettingsPage() {
         }
         return next;
       });
+      // A save can land and still leave a key behind: a key's storage is a write
+      // onto the role's agents, and an agent that refused it kept its old key.
+      // Nothing retries it later — the plugin kept no copy to retry from — so the
+      // field says so, in the same place a refusal does.
+      const landed: unknown = res.fields;
+      if (Array.isArray(landed) && landed.length > 0) {
+        const next: Record<string, string> = {};
+        for (const f of landed) {
+          const fe = f as { role?: string; field?: string; error?: string };
+          if (fe.role && fe.field) {
+            next[key(fe.role, fe.field)] = fe.error || "did not reach the agents";
+          }
+        }
+        setFieldErrors(next);
+      }
     } catch (err: any) {
       // A refused batch is answered with each bad field named (the PUT either
       // lands whole or not at all); the console's client puts the parsed body
@@ -573,12 +591,18 @@ export function SettingsPage() {
     const draft = drafts[k];
     const value = draft ? draft.value : s.value;
     const unsaved = draft !== undefined;
-    const overridden = s.dirty;
+    // A key row is never an edited one: the plugin keeps no key, so there is no
+    // edit here to have made. The flag is read off the spec rather than trusted
+    // from the answer, so a stale row from an older version — one that still
+    // carries the dirty flag a stored key used to set — cannot show a reset for a
+    // value nothing here holds.
+    const dirty = s.dirty && !spec.secret;
+    const overridden = dirty;
     // The upgrade hint (design decision 4): this edit was made away from an older
     // shipped default, and the running plugin ships a newer one. Untouched stale
     // fields need no hint — they were auto-adopted at startup already, which is why
     // their defaultVersion reads as the running version.
-    const stale = s.dirty && version !== "" && s.defaultVersion !== version;
+    const stale = dirty && version !== "" && s.defaultVersion !== version;
     const id = `settings-${s.role}-${s.field}`;
     const error = fieldErrors[k];
     const busy = busyKey === k;

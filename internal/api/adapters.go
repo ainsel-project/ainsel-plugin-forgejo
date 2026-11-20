@@ -206,7 +206,7 @@ func (a *hubAdapter) UpdateAgentImageEnv(ctx context.Context, imageID string, en
 // the only carriers of hubUpdate.LLM, and they carry the settings' values. Each
 // key rides when the caller named it (the role runs on that provider); an empty
 // one leaves that block alone — the hub keeps what it holds, which is what
-// "keep the stored key" means end to end.
+// "keep the key the agents hold" means end to end.
 //
 // enabledTools is the role's tool grant, in the image catalog's spellings. An empty
 // one is left off the request, which is the hub keeping the grant it holds: sending

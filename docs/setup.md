@@ -178,9 +178,13 @@ Three tabs, one per role. For each:
 | Working hours | optional, and per role — there is no *same for all roles* tick here, because three agents moving together is three decisions. Tick it and the role's agent works a window: which days, from when to when, in which zone. Unticked, the agent works any hour, which is what an install without a window means. |
 | Turn timeout | minutes one turn of this role's agent may run, written to the role image as `TURN_TIMEOUT_MS`. Prefilled with the shipped default (120 for the developer, 60 for the refiner and reviewer); any whole number of milliseconds from 1 minute to 1 day is accepted. On an edit the field starts at the value the install was last written with, and **empty means keep** — a re-apply never resets the image's timeout, so a value set by hand on the image survives. Setting it, though, restates the image's whole env list as `FORGEJO_TOKEN` plus `TURN_TIMEOUT_MS`, dropping any other entry the image carried (the `TURN_TIMEOUT_MS` paragraph under [S3](#s3--forgejo-accounts) spells that out). The plan shows the effective value per role before anything is written. |
 
+| Provider key | optional, and per role — the one secret this step asks for, because it is the only place a key can be given before the role's agent exists. It is used only while the role's provider holds one (`custom`, `openai`, `anthropic`, `google`); for any other provider the plan drops it, and an empty field is not a write of any kind. What you type goes to the hub as the agent's secret and is kept nowhere here. |
+
 The LLM each role runs on is not asked here: the provider and model are per-role
 settings on the [Settings page](#settings--per-role-configuration), edited after
-the install exists and pushed to the agents by the reconcile pass.
+the install exists and pushed to the agents by the reconcile pass. The key is the
+exception — it has no row in the settings table to wait in, so the step above is
+where a brand-new agent gets one.
 
 **The tool sets are editable, inside two fixed limits.** The shipped defaults are
 the baseline, and an admin's set has to respect the rules of least privilege:
@@ -409,9 +413,11 @@ The wizard installs; the **Settings** page (admin only) is where the configurati
 the plugin owns lives: three roles × twelve fields — persona text, skill text, the
 LLM the role's agent runs on (the custom provider's URL and key, one key row per
 vendor provider, and how an `openai` role authenticates), and the install's forge
-MCP row — global per role, no per-install overrides. A saved value
-lands on the agents, personas and MCP row with the next reconcile pass ("Check
-now" runs one on the spot).
+MCP row — global per role, no per-install overrides. Four of those twelve are provider
+keys, and none of them has a row in the plugin's settings table: a key's home is the
+hub's per-agent secret, so a saved key is written straight onto the role's agents and
+the table keeps no copy of it. Every other saved value lands on the agents, personas
+and MCP row with the next reconcile pass ("Check now" runs one on the spot).
 
 | Field | Notes |
 |---|---|
@@ -419,9 +425,9 @@ now" runs one on the spot).
 | LLM provider | a **dropdown** of the providers the plugin defines: `ollama-cloud` (the shipped default), `opencode`, `alibaba-cloud`, `openai`, `anthropic`, `google`, `custom`. The list ships with the plugin — a value outside it is refused on save, so a typo cannot silently mis-route the role's model. A provider stored by an older version that is not on the list stays visible and selectable in the dropdown, labeled as such, until the admin moves it onto a listed one. |
 | LLM model | free text — the model asked of the chosen provider. |
 | Custom provider URL | free text — the OpenAI-compatible endpoint a role on `custom` talks to. Required while the role's provider is `custom`: a save that moves a role onto `custom` without naming a URL (in the same batch or already stored) is refused, naming the field. |
-| Vendor provider keys (OpenAI, Anthropic, Google Gemini) | one write-only key row each, under the same contract as the custom provider key below. A key is used only while the role's provider names its vendor; a stored key of another provider is kept and never sent. The hub holds the key itself (blocks `openAI`, `anthropic`, `google` on the agent) — the plugin stores it in the settings and records only its fingerprint on the install row. **Needs a hub that knows these providers** (ainsel-project/ainsel#242): an older hub accepts the write and ignores the block, so the key never reaches the agent and nothing reports it — check the hub version before relying on a vendor key. |
-| OpenAI auth method | a **dropdown** with the two ways a role on `openai` authenticates: `APIKey` (the shipped default, and what the `llmOpenAIKey` row feeds) or `ChatGPTSignIn`, which sends no key at all and waits for an admin to sign the agent in in the AInsel console. The two are mutually exclusive: a save that picks the sign-in while naming an OpenAI key in the same batch is refused, naming the method row — the hub answers that pair with a 400. A key already stored under a role that signs in is kept and never sent; **Reset** the key row to clear it. The value means something only while the role's provider is `openai`; elsewhere it is stored and never written. **Needs a hub that knows the sign-in method**: an older hub accepts the write and ignores the field, leaving a keyless agent that reads as an API-key one. |
-| Custom provider key | write-only — sent on save, never served back. The console's answer always shows it empty; the row's "edited" tag is what tells you a key is stored. Saving it empty keeps the stored key; **Reset** is what clears it from the settings (the agent keeps the key the hub holds until the next key or URL write — the hub keeps what it holds on an empty write). Optional: a key-less local endpoint is legitimate. A saved key reaches the agent on the wizard's apply, and a key the agent does not have is written back by the re-apply pass. |
+| Vendor provider keys (OpenAI, Anthropic, Google Gemini) | one write-only key row each, under the same contract as the custom provider key below. A key is used only while the role's provider names its vendor; a key typed for a provider the role does not name is refused, naming the field. The hub holds the key itself (blocks `openAI`, `anthropic`, `google` on the agent) — the plugin stores none of it and records only its fingerprint on the install row. **Needs a hub that knows these providers** (ainsel-project/ainsel#242): an older hub accepts the write and ignores the block, so the key never reaches the agent and nothing reports it — check the hub version before relying on a vendor key. |
+| OpenAI auth method | a **dropdown** with the two ways a role on `openai` authenticates: `APIKey` (the shipped default, and what the `llmOpenAIKey` row feeds) or `ChatGPTSignIn`, which sends no key at all and waits for an admin to sign the agent in in the AInsel console. The two are mutually exclusive: a save that picks the sign-in while naming an OpenAI key in the same batch is refused, naming the method row — the hub answers that pair with a 400. A key the agent already holds under a role that moves to the sign-in is left where it is and never sent; the hub offers no way to clear an agent's key. The value means something only while the role's provider is `openai`; elsewhere it is stored and never written. **Needs a hub that knows the sign-in method**: an older hub accepts the write and ignores the field, leaving a keyless agent that reads as an API-key one. |
+| Custom provider key | write-only — typed on save, written onto the role's agents, never served back. The console's answer always shows it empty, and the row never reads as edited: the plugin keeps no key to have edited. Saving it empty says nothing at all — the agents keep the key they hold — and there is no reset, because the hub has no way to clear an agent's key; typing a new one over the old is the only write the row makes. The role has to have an installed agent to hold the key: a key for a role nobody installed is refused, that field alone, and the rest of the batch saves. Optional: a key-less local endpoint is legitimate. The wizard's Roles step carries the same optional key, which is how a key reaches an agent that does not exist yet. |
 | MCP server URL / MCP token env var | where the install's forge MCP server lives, and the *name* of the env var its token arrives in — never a token itself. The server itself is the operator-deployed upstream [Forgejo MCP server](https://git.b4mad.industries/agentic-forges/forgejo-mcp). |
 
 The winner rule is visible here: an edited field carries an "edited" tag and
@@ -496,8 +502,9 @@ is stored, so an edit only has to name what it changes:
 - the slug, and therefore every derived name, cannot change;
 - an edit creates no accounts, so it needs no admin token — the logins and teams
   follow the slug;
-- an empty LLM key keeps the key AInsel holds; a key is asked for again only when
-  the provider changed, because that is the only case the stored key does not fit;
+- an empty LLM key says nothing: the agents keep the key the hub holds. A key is asked
+  for again only when the provider changed, because that is the only case the key the
+  agents hold does not fit;
 - a changed exclude label rewrites the two refiner issue triggers; a changed base
   URL rewrites the three personas, which name the forge's address;
 - the base URL is chosen from the configured instances, and leaving the choice

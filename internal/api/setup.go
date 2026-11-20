@@ -284,6 +284,7 @@ func (svc *SetupService) Plan(ctx context.Context, caller *hub.Caller, req Setup
 	if err != nil {
 		return setup.Result{}, err
 	}
+	applyWizardKeys(vals, in)
 
 	snap, err := buildSnapshot(ctx, svc.Hub, svc.forgejoClientFor(in.BaseURL, existing), svc.Store, caller, in.AdminToken, in.Org, in.Slug, existing)
 	if err != nil {
@@ -324,6 +325,7 @@ func (svc *SetupService) Apply(ctx context.Context, caller *hub.Caller, req Setu
 	if err != nil {
 		return SetupApply{}, err
 	}
+	applyWizardKeys(vals, in)
 
 	fg := svc.forgejoClientFor(in.BaseURL, existing)
 	snap, err := buildSnapshot(ctx, svc.Hub, fg, svc.Store, caller, in.AdminToken, in.Org, in.Slug, existing)
@@ -1313,6 +1315,47 @@ func wizardSettings(ctx context.Context, st settingsReader) (setup.Settings, err
 		}
 	}
 	return vals, nil
+}
+
+// applyWizardKeys folds the wizard's optional per-role provider key into the
+// settings reading the plan and the apply are built on. The key is a
+// pass-through: it goes into the role's slot for the provider the role runs on
+// and marks the reading as wizard-sourced, so the plan previews the write and
+// the apply sends it as the agent's own hub secret. Nothing here stores it —
+// neither the settings table nor the install row ever sees it (R4).
+//
+// A key for a provider the role does not run on is dropped rather than stored
+// for later: the wizard names one key per role, and a key for a provider the
+// agent will not use has no agent to hold it. So does a key beside the ChatGPT
+// sign-in — the hub refuses the pair, and the sign-in is the method the role
+// asked for.
+func applyWizardKeys(vals setup.Settings, in setup.Input) {
+	for role, ri := range in.Roles {
+		key := strings.TrimSpace(ri.LLMKey)
+		if key == "" || vals.LLM == nil {
+			continue
+		}
+		llm := vals.LLM[role]
+		switch llm.Provider {
+		case setup.LLMProviderCustom:
+			llm.CustomKey = key
+		case setup.LLMProviderOpenAI:
+			if setup.IsChatGPTSignIn(llm.OpenAIAuthMethod) {
+				continue
+			}
+			llm.OpenAIKey = key
+		case setup.LLMProviderAnthropic:
+			llm.AnthropicKey = key
+		case setup.LLMProviderGoogle:
+			llm.GoogleKey = key
+		default:
+			// A provider the plugin holds no key for (ollama-cloud, opencode,
+			// alibaba-cloud): nothing to fill, and nothing to say.
+			continue
+		}
+		llm.KeyFromWizard = true
+		vals.LLM[role] = llm
+	}
 }
 
 // buildSnapshot constructs the snapshot needed for planning.

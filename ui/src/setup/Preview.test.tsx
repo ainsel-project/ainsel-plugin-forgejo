@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { Preview } from "./Preview";
+import { Preview, triggerRole } from "./Preview";
 
 // A plan with the given lists and verdict; the rest is empty, so each test states only what it
 // is about.
@@ -193,5 +193,23 @@ describe("Preview (S6)", () => {
     expect(applyBtn.disabled).toBe(false);
     applyBtn.click();
     expect(onApply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Preview agent names", () => {
+  afterEach(cleanup);
+
+  it("names a trigger's agent through agentLabel, not by its hub id", () => {
+    const plan = planOf({
+      triggers: [{ name: "forgejo-refiner-issue-opened-demo", agentRef: "a-5950e4c3", connectorRef: "c-1", filters: [] }],
+    });
+    render(<Preview plan={plan} onApply={vi.fn()} onBack={vi.fn()} agentLabel={() => "Refiner of demo"} />);
+    expect(screen.getByText("Refiner of demo")).toBeTruthy();
+    expect(screen.queryByText("a-5950e4c3")).toBeNull();
+  });
+
+  it("reads the role off a trigger's generated name", () => {
+    expect(triggerRole("forgejo-developer-mention-demo")).toBe("developer");
+    expect(triggerRole("someone-elses-trigger")).toBeNull();
   });
 });

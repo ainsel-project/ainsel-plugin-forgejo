@@ -839,3 +839,32 @@ func TestWorkSkipsRetiringInstalls(t *testing.T) {
 		}
 	}
 }
+
+// TestWorkNamesEachRunsAgentByItsDisplayName: a page shows an agent as the admin named it,
+// not as the hub's id — and an agent the hub does not list keeps its id rather than going
+// blank.
+func TestWorkNamesEachRunsAgentByItsDisplayName(t *testing.T) {
+	spy := newSpy()
+	runs := fixtureRuns()
+	spy.Fake.Agents = []hub.Ref{{ID: runs[0].Agent, Name: "Refiner of apps"}}
+	svc := NewWorkService(spy, testStore(t, appsInstall()), testBase)
+
+	now, err := svc.Now(context.Background())
+	if err != nil {
+		t.Fatalf("Now: %v", err)
+	}
+	named := false
+	for _, r := range now {
+		want := r.Run.Agent
+		if r.Run.Agent == runs[0].Agent {
+			want = "Refiner of apps"
+			named = true
+		}
+		if r.Run.AgentName != want {
+			t.Errorf("run %s agentName = %q, want %q", r.Run.ID, r.Run.AgentName, want)
+		}
+	}
+	if !named {
+		t.Fatalf("no active run belongs to %s: the test names nobody", runs[0].Agent)
+	}
+}

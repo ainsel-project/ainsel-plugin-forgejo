@@ -308,11 +308,9 @@ describe("LivePage", () => {
   });
 
   it("shows the run queue with the runs of the selected tab", async () => {
-    agentsBody = {
-      items: [{ id: "forgejo-developer-demo", displayName: "Wedge" }],
-    };
     answers([
-      makeRun("r-run", { status: "running" }),
+      // The display name rides on the run: the work API resolves it.
+      makeRun("r-run", { status: "running", agentName: "Wedge" }),
       makeRun("r-queued", {
         status: "queued",
         agent: "forgejo-refiner-demo",
@@ -375,8 +373,7 @@ describe("LivePage", () => {
     expect(within(queue).queryByRole("link", { name: "Thread 8" })).toBeNull();
   });
 
-  it("falls back to the agent id when the hub lists no name for it", async () => {
-    agentsBody = { items: [{ id: "someone-else", displayName: "Other" }] };
+  it("falls back to the agent id when the run carries no name", async () => {
     answers([makeRun("r-run", { status: "running" })]);
 
     render(<LivePage />);

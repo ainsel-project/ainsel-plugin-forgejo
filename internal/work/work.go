@@ -24,9 +24,12 @@ type Run struct {
 	// ID is the AInsel invocation id, and the handle back to the run.
 	ID string `json:"id"`
 
-	// Agent is the name of the agent that ran, Role the persona it ran as.
-	Agent string `json:"agent"`
-	Role  string `json:"role"`
+	// Agent is the id of the agent that ran (the hub's metadata.name, what an install
+	// keys roles by), AgentName its display name — what a page shows — and Role the
+	// persona it ran as. AgentName is the id again when the hub would not name it.
+	Agent     string `json:"agent"`
+	AgentName string `json:"agentName,omitempty"`
+	Role      string `json:"role"`
 
 	// Status is the invocation status: queued, running, success, failure or
 	// timeout.

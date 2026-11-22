@@ -602,11 +602,6 @@ func (a Apply) createInstall(ctx context.Context, in Input, plan Result) (instal
 		// next edit diffs against — not as a copy of what the hub holds, which an admin may
 		// change in the console.
 		roleState.WorkingHours = CloneWorkingHours(in.role(role).WorkingHours)
-		// The patrol the form named, recorded the way the window above is: what the
-		// wizard wrote, not what the hub holds. A create is where this row first exists,
-		// so a patrol switched off at creation writes the row and nothing on the hub —
-		// CronTriggers below reads it and files no trigger.
-		roleState.Patrol = patrolFor(nil, in.role(role).Patrol)
 		// The auth method the agent was created with goes in the row beside the
 		// provider: it is the other half of "what does this agent authenticate
 		// with", and the re-apply loop can only hold what a row records. A role on
@@ -666,7 +661,7 @@ func (a Apply) createInstall(ctx context.Context, in Input, plan Result) (instal
 	// Step 7b: CreateCronTrigger (the developer's scheduled PR patrol). Created
 	// with the event triggers, in the same phase: an install is not complete until
 	// the developer is woken for the pulls nobody mentions it about.
-	for _, cronTrigger := range CronTriggers(install) {
+	for _, cronTrigger := range CronTriggers(install, DefaultPatrolSpec()) {
 		cronTriggerID, err := a.Hub.CreateCronTrigger(ctx, in.GroupID, cronTrigger)
 		if err != nil {
 			return Install{}, report, fmt.Errorf("CreateCronTrigger: %w", err)
@@ -960,79 +955,6 @@ func (a Apply) editInstall(ctx context.Context, in Input, plan Result, prev *Ins
 		}
 
 		install.Roles[role] = roleState
-	}
-
-	// The developer's PR patrol: its cadence, and whether it is allowed to fire at all.
-	// Like the window above, the diff is against the install row and not the live
-	// trigger, so this block runs only when the admin moved the patrol on the form — and
-	// then moves only the half the admin moved. A cadence the hub's Schedules UI was
-	// retuned to is sent back untouched by an apply that came to switch the patrol off,
-	// and a prompt edited there is sent back untouched by an apply that came to retune the
-	// cadence.
-	//
-	// Switching it off writes `enabled: false` rather than deleting the row: a deleted
-	// patrol has nothing to switch back on, and re-filing one would quietly throw away
-	// whatever the console holds in its place. A row that is missing while the install
-	// now wants a patrol is created, which is the same repair the re-apply loop makes —
-	// and the same one it skips when the row says off, because that loop generates the
-	// wanted set from this row too.
-	if in.role(RoleDeveloper).Patrol != nil && changed(KindCronTrigger, RoleDeveloper, FieldPatrol) {
-		roleState := install.Roles[RoleDeveloper]
-		d := CronPatrolDiff(roleState.Patrol, in.role(RoleDeveloper).Patrol)
-		roleState.Patrol = patrolFor(roleState.Patrol, in.role(RoleDeveloper).Patrol)
-		install.Roles[RoleDeveloper] = roleState
-		want := PatrolWanted(roleState.Patrol)
-		name := CronPatrolName(prev.Slug)
-		op := Op{Kind: KindCronTrigger, Name: name, Detail: diff("patrol", PatrolSummary(d.From), PatrolSummary(d.To)), Role: RoleDeveloper}
-
-		existing, err := a.Hub.ListCronTriggers(ctx)
-		if err != nil {
-			return Install{}, report, fmt.Errorf("ListCronTriggers: %w", err)
-		}
-		var row *CronTrigger
-		for i, ct := range existing {
-			if ct.Name == name {
-				row = &existing[i]
-				break
-			}
-		}
-		switch {
-		case row == nil && !want.Enabled:
-			// Off, and no row to switch off — an install that never had a patrol and
-			// switched it off before it ever ran. The row now says off, which is what
-			// keeps the re-apply loop from filing one the admin just refused.
-			report.Created = append(report.Created, op)
-		case row == nil:
-			if _, err := a.Hub.CreateCronTrigger(ctx, install.GroupID, CronTrigger{
-				Name:     name,
-				AgentRef: roleState.AgentID,
-				Schedule: want.Schedule,
-				Prompt:   CronPatrolPrompt,
-				Enabled:  true,
-			}); err != nil {
-				return Install{}, report, fmt.Errorf("CreateCronTrigger: %w", err)
-			}
-			report.Created = append(report.Created, op)
-		default:
-			// The hub's update takes the prompt on every write, so the row's own is sent
-			// back — including whatever an admin typed over the shipped one on the
-			// Schedules UI. A list that answers without one sends the shipped brief rather
-			// than an empty string, which the hub would store as a patrol with no brief.
-			prompt := row.Prompt
-			if prompt == "" {
-				prompt = CronPatrolPrompt
-			}
-			if err := a.Hub.UpdateCronTrigger(ctx, row.ID, CronTriggerUpdate{
-				Name:     row.Name,
-				AgentRef: row.AgentRef,
-				Prompt:   prompt,
-				Schedule: d.Schedule,
-				Enabled:  d.Enabled,
-			}); err != nil {
-				return Install{}, report, fmt.Errorf("UpdateCronTrigger: %w", err)
-			}
-			report.Created = append(report.Created, op)
-		}
 	}
 
 	// The exclude label is a filter on the refiner's two issue triggers, so changing

@@ -2357,14 +2357,10 @@ func TestPassCreatesPrPatrolOnce(t *testing.T) {
 	}
 }
 
-// TestPassLeavesARetunedPatrolAlone: the pass matches by name, so an admin
-// who retuned the schedule on the hub is not fought by the next pass.
-func TestPassLeavesARetunedPatrolAlone(t *testing.T) {
-	ctx := context.Background()
-	st, cleanup := tmpStore(t)
-	defer cleanup()
-
-	install := setup.Install{
+// patrolInstall is the one install the patrol tests share: a developer agent to fire at
+// and nothing else.
+func patrolInstall() setup.Install {
+	return setup.Install{
 		Slug:          "app",
 		LayoutVersion: setup.LayoutManagedAgents,
 		GroupID:       "g-1",
@@ -2373,7 +2369,16 @@ func TestPassLeavesARetunedPatrolAlone(t *testing.T) {
 			setup.RoleDeveloper: {AgentID: "a-developer"},
 		},
 	}
-	if err := st.Save(ctx, install); err != nil {
+}
+
+// TestPassHoldsThePatrolToTheGlobalSetting: the patrol is one plugin-wide setting, so a
+// trigger whose cadence was retuned on the hub is put back on it — and only its cadence:
+// the prompt an admin edited stays, and a pass that finds nothing to move writes nothing.
+func TestPassHoldsThePatrolToTheGlobalSetting(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, patrolInstall()); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -2385,13 +2390,137 @@ func TestPassLeavesARetunedPatrolAlone(t *testing.T) {
 			AgentRef: "a-developer", Schedule: "0 2 * * *", Prompt: "Retuned.", Enabled: true,
 		}},
 	}
-	engine := Engine{Hub: f, Store: st, Log: func(slug, msg string) {}}
+	set := fakeSettings{rows: []settings.Setting{
+		{Role: "developer", Field: settings.FieldPatrolInterval, Value: "2h"},
+	}}
+	engine := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
 
 	if _, err := engine.Pass(ctx, ScopeAll); err != nil {
 		t.Fatalf("Pass: %v", err)
 	}
 	if len(f.CreatedCronTriggers) != 0 {
-		t.Errorf("created cron triggers = %d, want 0 — a retuned patrol is not drift", len(f.CreatedCronTriggers))
+		t.Errorf("created cron triggers = %d, want 0 — the trigger exists", len(f.CreatedCronTriggers))
+	}
+	if len(f.UpdatedCronTriggers) != 1 {
+		t.Fatalf("updated cron triggers = %d, want 1", len(f.UpdatedCronTriggers))
+	}
+	u := f.UpdatedCronTriggers[0]
+	if u.ID != "c-9" || u.Update.Schedule == nil || *u.Update.Schedule != "0 */2 * * *" {
+		t.Errorf("update = %+v, want c-9 moved to 0 */2 * * *", u)
+	}
+	if u.Update.Enabled != nil {
+		t.Errorf("update moved enabled = %v, want it left alone", *u.Update.Enabled)
+	}
+	if u.Update.Prompt != "Retuned." {
+		t.Errorf("update prompt = %q, want the row's own sent back", u.Update.Prompt)
+	}
+
+	// A second pass finds it where the setting says and writes nothing.
+	if _, err := engine.Pass(ctx, ScopeAll); err != nil {
+		t.Fatalf("second Pass: %v", err)
+	}
+	if len(f.UpdatedCronTriggers) != 1 {
+		t.Errorf("updated cron triggers after the second pass = %d, want still 1", len(f.UpdatedCronTriggers))
+	}
+}
+
+// TestPassSwitchesThePatrolOffAndOn: the enablement is the setting's too. Off writes
+// `enabled: false` onto the row rather than deleting it, and on writes it back.
+func TestPassSwitchesThePatrolOffAndOn(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, patrolInstall()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	f := &hub.Fake{
+		PluginGroupsSeed: []string{"g-1"},
+		Triggers:         map[string][]setup.Trigger{},
+		CronTriggers: []setup.CronTrigger{{
+			ID: "c-1", Name: "forgejo-developer-pr-patrol-app",
+			AgentRef: "a-developer", Schedule: "*/30 * * * *", Prompt: "Mine.", Enabled: true,
+		}},
+	}
+	run := func(value string) {
+		t.Helper()
+		set := fakeSettings{rows: []settings.Setting{
+			{Role: "developer", Field: settings.FieldPatrolEnabled, Value: value},
+		}}
+		engine := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
+		if _, err := engine.Pass(ctx, ScopeAll); err != nil {
+			t.Fatalf("Pass: %v", err)
+		}
+	}
+
+	run(settings.PatrolOff)
+	if f.CronTriggers[0].Enabled {
+		t.Errorf("patrol still enabled after the setting went off")
+	}
+	if len(f.DeletedCronTriggers) != 0 {
+		t.Errorf("deleted cron triggers = %v, want none — off is never a delete", f.DeletedCronTriggers)
+	}
+	if f.CronTriggers[0].Prompt != "Mine." {
+		t.Errorf("prompt = %q, want it untouched", f.CronTriggers[0].Prompt)
+	}
+
+	run(settings.PatrolOn)
+	if !f.CronTriggers[0].Enabled {
+		t.Errorf("patrol still disabled after the setting went back on")
+	}
+}
+
+// TestPassFilesADisabledPatrolWhenTheSettingIsOff: a patrol the settings switch off is still
+// filed, with `enabled: false`, so it shows on the hub's Schedules UI and switching it back on
+// is an update rather than a re-file.
+func TestPassFilesADisabledPatrolWhenTheSettingIsOff(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, patrolInstall()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	f := &hub.Fake{PluginGroupsSeed: []string{"g-1"}, Triggers: map[string][]setup.Trigger{}}
+	set := fakeSettings{rows: []settings.Setting{
+		{Role: "developer", Field: settings.FieldPatrolEnabled, Value: settings.PatrolOff},
+		{Role: "developer", Field: settings.FieldPatrolInterval, Value: "6h"},
+	}}
+	engine := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
+
+	if _, err := engine.Pass(ctx, ScopeAll); err != nil {
+		t.Fatalf("Pass: %v", err)
+	}
+	if len(f.CreatedCronTriggers) != 1 {
+		t.Fatalf("created cron triggers = %d, want 1", len(f.CreatedCronTriggers))
+	}
+	if ct := f.CreatedCronTriggers[0]; ct.Enabled || ct.Schedule != "0 */6 * * *" {
+		t.Errorf("created = %+v, want a disabled patrol on 0 */6 * * *", ct)
+	}
+}
+
+// TestPassIgnoresAPatrolIntervalThePluginDoesNotOffer: a row written by hand with a cadence
+// outside the list leaves the shipped cadence in force — the pass never writes a schedule it
+// cannot name.
+func TestPassIgnoresAPatrolIntervalThePluginDoesNotOffer(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := tmpStore(t)
+	defer cleanup()
+	if err := st.Save(ctx, patrolInstall()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	f := &hub.Fake{PluginGroupsSeed: []string{"g-1"}, Triggers: map[string][]setup.Trigger{}}
+	set := fakeSettings{rows: []settings.Setting{
+		{Role: "developer", Field: settings.FieldPatrolInterval, Value: "1m"},
+	}}
+	engine := Engine{Hub: f, Store: st, Settings: set, Log: func(slug, msg string) {}}
+
+	if _, err := engine.Pass(ctx, ScopeAll); err != nil {
+		t.Fatalf("Pass: %v", err)
+	}
+	if len(f.CreatedCronTriggers) != 1 || f.CreatedCronTriggers[0].Schedule != "*/30 * * * *" {
+		t.Errorf("created = %+v, want one patrol on the shipped */30 * * * *", f.CreatedCronTriggers)
 	}
 }
 
@@ -2425,70 +2554,6 @@ func TestPassSkipsPatrolWithoutDeveloperAgent(t *testing.T) {
 	}
 	if len(f.CreatedCronTriggers) != 0 {
 		t.Errorf("created cron triggers = %d, want 0 without a developer agent", len(f.CreatedCronTriggers))
-	}
-}
-
-// TestPassFilesNothingForAPatrolTheInstallSwitchedOff is the pass's half of the rule the
-// wizard's answer has to hold: the wanted set is generated from the install row, so a row
-// that says off asks for nothing, and the pass that would otherwise re-file the shipped
-// patrol files nothing.
-//
-// The second case is the one that would be the bug. An admin who switched the patrol off in
-// the wizard and back on in the console has changed the console's mind, not the wizard's, and
-// the pass has no reading of the console's intent to correct it with — so it writes nothing
-// at all. The pass only ever creates what the row asks for; it never re-enables.
-func TestPassFilesNothingForAPatrolTheInstallSwitchedOff(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		seeds []setup.CronTrigger
-	}{
-		{"with no row on the hub at all", nil},
-		{
-			"with one the console switched back on",
-			[]setup.CronTrigger{{
-				ID: "c-1", Name: "forgejo-developer-pr-patrol-app",
-				AgentRef: "a-developer", Schedule: "*/5 * * * *", Prompt: "Retuned.", Enabled: true,
-			}},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			st, cleanup := tmpStore(t)
-			defer cleanup()
-
-			install := setup.Install{
-				Slug:          "app",
-				LayoutVersion: setup.LayoutManagedAgents,
-				GroupID:       "g-1",
-				ConnectorID:   "c-app",
-				Roles: map[setup.Role]setup.RoleState{
-					setup.RoleDeveloper: {
-						AgentID: "a-developer",
-						Patrol:  &setup.Patrol{Enabled: false, Schedule: "*/30 * * * *"},
-					},
-				},
-			}
-			if err := st.Save(ctx, install); err != nil {
-				t.Fatalf("Save: %v", err)
-			}
-
-			f := &hub.Fake{
-				PluginGroupsSeed: []string{"g-1"},
-				Triggers:         map[string][]setup.Trigger{},
-				CronTriggers:     tc.seeds,
-			}
-			engine := Engine{Hub: f, Store: st, Log: func(slug, msg string) {}}
-
-			if _, err := engine.Pass(ctx, ScopeAll); err != nil {
-				t.Fatalf("Pass: %v", err)
-			}
-			if len(f.CreatedCronTriggers) != 0 {
-				t.Errorf("created cron triggers = %d, want 0 — the row says the patrol is off", len(f.CreatedCronTriggers))
-			}
-			if len(f.UpdatedCronTriggers) != 0 {
-				t.Errorf("updated cron triggers = %d, want 0 — the pass does not re-enable or retune", len(f.UpdatedCronTriggers))
-			}
-		})
 	}
 }
 

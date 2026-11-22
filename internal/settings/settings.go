@@ -89,6 +89,14 @@ const (
 	FieldLLMGoogleKey        = "llmGoogleKey"
 	FieldMCPUrl              = "mcpUrl"
 	FieldMCPTokenFromEnv     = "mcpTokenFromEnv"
+
+	// FieldPatrolEnabled and FieldPatrolInterval are the developer's scheduled PR
+	// patrol, one plugin-wide setting: whether it runs, and how often. They exist for
+	// the developer role alone (see isPatrolField) — the other two roles have no patrol —
+	// and the reconcile pass writes them onto every install's patrol trigger, so there
+	// is no per-install cadence to pick.
+	FieldPatrolEnabled  = "patrolEnabled"
+	FieldPatrolInterval = "patrolInterval"
 )
 
 // Fields lists every settings field, in the order the API lists them.
@@ -105,6 +113,8 @@ var Fields = []string{
 	FieldLLMGoogleKey,
 	FieldMCPUrl,
 	FieldMCPTokenFromEnv,
+	FieldPatrolEnabled,
+	FieldPatrolInterval,
 }
 
 // The shipped LLM wiring: the provider and model a role runs on until an
@@ -248,8 +258,53 @@ func Default(role setup.Role, field string) string {
 		return DefaultMCPUrl
 	case FieldMCPTokenFromEnv:
 		return setup.TokenEnvName
+	case FieldPatrolEnabled:
+		return PatrolOn
+	case FieldPatrolInterval:
+		return setup.DefaultPatrolInterval
 	}
 	return ""
+}
+
+// PatrolOn and PatrolOff are the two values of the patrolEnabled field.
+const (
+	PatrolOn  = "true"
+	PatrolOff = "false"
+)
+
+// Applies says whether a (role, field) is a row the registry answers with: every field
+// exists for every role except the patrol, which is the developer's alone.
+func Applies(role setup.Role, field string) bool {
+	return !isPatrolField(field) || role == setup.RoleDeveloper
+}
+
+// isPatrolField says whether a field is one of the two patrol settings, which exist for
+// the developer role alone.
+func isPatrolField(field string) bool {
+	return field == FieldPatrolEnabled || field == FieldPatrolInterval
+}
+
+// patrolIntervalOptions is the cadence dropdown: the plugin's offered intervals, plus
+// the stored value when it is not on the list (a row written by hand), labeled as such —
+// the same shape the provider dropdown has.
+func patrolIntervalOptions(value string) []LLMProvider {
+	out := make([]LLMProvider, 0, len(setup.PatrolIntervals)+1)
+	listed := false
+	for _, iv := range setup.PatrolIntervals {
+		out = append(out, LLMProvider{Value: iv, Label: "every " + iv})
+		if iv == value {
+			listed = true
+		}
+	}
+	if !listed {
+		out = append(out, LLMProvider{Value: value, Label: value + " (current, not in list)"})
+	}
+	return out
+}
+
+// patrolEnabledOptions is the patrol's on/off dropdown.
+func patrolEnabledOptions() []LLMProvider {
+	return []LLMProvider{{Value: PatrolOn, Label: "On"}, {Value: PatrolOff, Label: "Off"}}
 }
 
 // Setting is one (role, field) as the API answers with it: the value in
@@ -442,6 +497,10 @@ func (s *Store) All(ctx context.Context) ([]Setting, error) {
 	out := make([]Setting, 0, len(Roles)*len(Fields))
 	for _, role := range Roles {
 		for _, field := range Fields {
+			// The patrol is the developer's alone: the other roles have no row for it.
+			if isPatrolField(field) && role != setup.RoleDeveloper {
+				continue
+			}
 			def := Default(role, field)
 			set := Setting{
 				Role:           string(role),
@@ -463,6 +522,12 @@ func (s *Store) All(ctx context.Context) ([]Setting, error) {
 			}
 			if field == FieldLLMOpenAIAuthMethod {
 				set.Options = llmAuthMethodOptions(set.Value)
+			}
+			if field == FieldPatrolEnabled {
+				set.Options = patrolEnabledOptions()
+			}
+			if field == FieldPatrolInterval {
+				set.Options = patrolIntervalOptions(set.Value)
 			}
 			out = append(out, set)
 		}
@@ -931,8 +996,21 @@ func checkEdit(e Edit) *FieldError {
 	if !isField(e.Field) {
 		return bad("unknown field")
 	}
+	if isPatrolField(e.Field) && setup.Role(e.Role) != setup.RoleDeveloper {
+		return bad("the patrol is the developer's: only the developer role has " + e.Field)
+	}
 	if e.Reset {
 		return nil
+	}
+	if e.Field == FieldPatrolEnabled && e.Value != PatrolOn && e.Value != PatrolOff {
+		return bad("patrolEnabled is " + PatrolOn + " or " + PatrolOff)
+	}
+	if e.Field == FieldPatrolInterval {
+		// The same list the dropdown offers is the write path's rule: nothing below ten
+		// minutes and nothing above a day is a patrol this plugin will file.
+		if _, err := setup.PatrolSchedule(e.Value); err != nil {
+			return bad(err.Error())
+		}
 	}
 	if e.Field == FieldSkillText {
 		if err := checkSkillText(setup.Role(e.Role), e.Value); err != nil {

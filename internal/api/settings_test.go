@@ -118,8 +118,8 @@ func TestSettingsGETAnswersDefaults(t *testing.T) {
 	}
 
 	list := decodedSettings(t, w.Body.String())
-	if len(list) != 36 {
-		t.Fatalf("got %d settings, want 3 roles × 12 fields", len(list))
+	if len(list) != 38 {
+		t.Fatalf("got %d settings, want 3 roles × 12 fields and the developer's 2 patrol fields", len(list))
 	}
 	for _, role := range []string{"refiner", "developer", "reviewer"} {
 		persona, ok := settingIn(list, role, settings.FieldPersonaText)

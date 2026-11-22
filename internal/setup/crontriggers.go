@@ -18,11 +18,10 @@ type CronTrigger struct {
 	Enabled  bool   `json:"enabled"`
 }
 
-// CronPatrolSchedule is the PR patrol's cadence: every 30 minutes, so a CI
+// CronPatrolSchedule is the PR patrol's shipped cadence: every 30 minutes, so a CI
 // failure, a review comment or a merge conflict on an open pull is acted on
-// within half an hour of appearing. An admin may retune it on the hub's Schedules
-// UI — CronMissing matches by name, so the reconcile loop never fights an edited
-// schedule.
+// within half an hour of appearing. The patrolInterval setting moves it; this is
+// what a new install files its trigger with and what the setting defaults to.
 const CronPatrolSchedule = "*/30 * * * *"
 
 // CronPatrolPrompt is the patrol's whole brief. The hub fires it verbatim with no
@@ -45,18 +44,13 @@ const CronPatrolPrompt = "Scheduled PR patrol. List the open pull requests autho
 // the way the event triggers are named (R3). Like them it is not stored on the
 // install row; it is recognised by name.
 //
-// It reads the row's patrol, though, because this function is what both the re-apply
-// loop and the apply's create path build from: a row written before the patrol was a
-// choice says nothing and gets the shipped cadence, and one switched off gets no
-// trigger at all. That is the whole of why a patrol an admin turned off in the wizard
-// is not re-filed by the next pass — and, with the diff's row baseline, why one they
-// retuned on the hub's Schedules UI is not fought either.
-func CronTriggers(in Install) []CronTrigger {
-	want := PatrolWanted(in.Roles[RoleDeveloper].Patrol)
-	if !want.Enabled {
-		return nil
-	}
-	schedule := want.Schedule
+// The patrol is the plugin's one setting, so the spec arrives from the caller rather
+// than off the row: a new install files its trigger with DefaultPatrolSpec, and the
+// reconcile pass files and retunes it from the settings. A patrol the settings switch
+// off is still filed — with `enabled: false` — so it stays visible on the hub's
+// Schedules UI with its prompt, and switching it back on is an update, not a re-file.
+func CronTriggers(in Install, spec PatrolSpec) []CronTrigger {
+	schedule := spec.Schedule
 	if schedule == "" {
 		schedule = CronPatrolSchedule
 	}
@@ -66,7 +60,7 @@ func CronTriggers(in Install) []CronTrigger {
 			AgentRef: in.Roles[RoleDeveloper].AgentID,
 			Schedule: schedule,
 			Prompt:   CronPatrolPrompt,
-			Enabled:  true,
+			Enabled:  spec.Enabled,
 		},
 	}
 }

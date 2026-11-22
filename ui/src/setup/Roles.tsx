@@ -2,18 +2,11 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { Button, Field, Input, Notice } from "@ainsel/plugin-sdk";
 import type { RoleToolSets } from "../api";
-import type { Input as InputType, PatrolInput, RoleInput, WorkingHours } from "./model";
+import type { Input as InputType, RoleInput, WorkingHours } from "./model";
 import {
-  PATROL_DEFAULT_SCHEDULE,
-  PATROL_INTERVALS,
   ROLE_COLOR,
   TURN_TIMEOUT_DEFAULT_MS,
   newWorkingHours,
-  patrolCost,
-  patrolEnabledOf,
-  patrolIntervalFor,
-  patrolScheduleOf,
-  patrolSummary,
   turnTimeoutMinutesFromMs,
   turnTimeoutMsFromMinutes,
   workingHoursText,
@@ -269,18 +262,6 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
     handleRoleChange(role, { workingHours: { ...w, ...updates } });
   };
 
-  // The patrol's two handles. Each moves one part of the answer and leaves the other as the install
-  // had it: picking a cadence does not claim the admin switched the patrol on, and moving the tick
-  // does not restate a cadence. An answer that moves neither keeps the cadence the install runs —
-  // which is what an untouched field means, and why an untouched field draws no op.
-  const handlePatrolToggle = (role: RoleKey, on: boolean) => {
-    handleRoleChange(role, { patrol: { ...(input.roles[role].patrol ?? {}), enabled: on } });
-  };
-
-  const handlePatrolField = (role: RoleKey, updates: Partial<PatrolInput>) => {
-    handleRoleChange(role, { patrol: { ...(input.roles[role].patrol ?? {}), ...updates } });
-  };
-
   // One card per role, stacked: the three are short enough to read together, and the step's
   // refusal names the ones still missing a runtime right where each is entered.
   const renderRoleCard = (role: RoleKey) => {
@@ -513,111 +494,6 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             </p>
           )}
         </div>
-
-        {/* The developer's scheduled PR patrol — the one thing an install does on its own
-            initiative, and the one that costs a model call every time it fires. It is offered as a
-            tick and a list of cadences rather than a cron box first, because a cadence is what the
-            admin thinks in; the expression box is there for the cadence no chip offers. What the
-            answers never do is delete: switching the patrol off writes the hub row's
-            `enabled: false`, so its prompt and its history stay and the tick can move back. */}
-        {role === "developer" && (
-          <div
-            className="forgejo-patrol"
-            role="group"
-            aria-label="Developer PR patrol"
-            style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
-          >
-            <label
-              className="forgejo-patrol-toggle"
-              style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8125rem", color: "var(--ink-2)" }}
-            >
-              <input
-                className="forgejo-patrol-on"
-                type="checkbox"
-                checked={patrolEnabledOf(roleData.patrol)}
-                onChange={(e: any) => handlePatrolToggle(role, e.target.checked)}
-              />
-              Check my pull requests on a schedule
-            </label>
-
-            {/* The cadences, as chips: they are a either/or set, and the same chip the working-day
-                picker uses says so. A chip marks the cadence the answer leaves in force, so a
-                hand-typed expression leaves none ticked — honestly, since no chip means it. */}
-            <div
-              role="group"
-              aria-label="Developer patrol cadence"
-              style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}
-            >
-              {PATROL_INTERVALS.map((iv) => {
-                const checked = patrolIntervalFor(patrolScheduleOf(roleData.patrol)) === iv;
-                return (
-                  <button
-                    key={iv}
-                    type="button"
-                    className="forgejo-patrol-cadence"
-                    aria-pressed={checked}
-                    onClick={() => handlePatrolField(role, { interval: iv, schedule: "" })}
-                    style={dayChipStyle(checked)}
-                  >
-                    {iv}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* The expression, for what the list cannot offer. It wins over a chip rather than
-                competing with one: a cadence has one spelling in force, and it is this one. The plan
-                shapes it and the hub is the one that says whether it means what the admin typed. */}
-            <Field
-              htmlFor={`roles-${role}-patrol-cron`}
-              label="Cron expression"
-              hint="Only for a cadence the chips do not offer — it wins over a ticked chip. Empty keeps the install's cadence."
-            >
-              <Input
-                id={`roles-${role}-patrol-cron`}
-                value={roleData.patrol?.schedule ?? ""}
-                onChange={(e: any) =>
-                  handlePatrolField(role, { schedule: e.target.value, interval: "" })
-                }
-                placeholder={PATROL_DEFAULT_SCHEDULE}
-              />
-            </Field>
-
-            {/* The patrol in one line, in the words the plan's preview uses — so what the admin reads
-                here is what the plan will name on the op. */}
-            <p
-              className="forgejo-patrol-summary"
-              style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink-3)", fontFamily: MONO_FONT }}
-            >
-              {patrolSummary(roleData.patrol)}
-            </p>
-
-            {/* What a very short cadence costs, said where it is chosen. The plan says the same in
-                its warnings, so nothing is announced only after the admin has agreed to it. */}
-            {patrolCost(roleData.patrol) !== "" && (
-              <p
-                className="forgejo-patrol-cost"
-                style={{ margin: 0, fontSize: "0.75rem", color: "var(--warn)" }}
-              >
-                {patrolCost(roleData.patrol)}
-              </p>
-            )}
-
-            {/* What leaving the whole group alone means. It is not the same nothing as a cleared
-                field: an untouched patrol sends nothing at all, so the install keeps the cadence its
-                row records — and a patrol changed on the AInsel console's Schedules UI stays there,
-                because this plugin diffs against the row and never against the hub. */}
-            {roleData.patrol === undefined && (
-              <p
-                className="forgejo-patrol-none-hint"
-                style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink-3)" }}
-              >
-                Left alone, the patrol runs at the cadence this install records — every 30 minutes on
-                one that never chose — and a patrol changed on the AInsel console stays as it is.
-              </p>
-            )}
-          </div>
-        )}
 
         {/* A tool list is a group of toggles, so it is marked up as the group it is: the label
             names the set, not a member of it. */}

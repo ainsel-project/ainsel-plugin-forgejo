@@ -436,6 +436,26 @@ func (c *HTTPClient) CreateCronTrigger(ctx context.Context, groupID string, ct s
 	return ref, nil
 }
 
+// cronTriggerUpdateRequest is a cron trigger update. The hub requires the name, the
+// agent and the prompt on every write, so all three are always sent; the schedule and
+// the enablement are the two an install may mean to move, and an absent one is left
+// where it is rather than cleared.
+type cronTriggerUpdateRequest struct {
+	Name     string  `json:"name"`
+	AgentRef string  `json:"agentRef"`
+	Prompt   string  `json:"prompt"`
+	Schedule *string `json:"schedule,omitempty"`
+	Enabled  *bool   `json:"enabled,omitempty"`
+}
+
+// UpdateCronTrigger writes one scheduled prompt by id — the generated id a list
+// carried, since display names are not unique and are not lookups.
+func (c *HTTPClient) UpdateCronTrigger(ctx context.Context, id string, u CronTriggerUpdate) error {
+	// The two types are the same shape on purpose: the request is the update, and a
+	// nil half of it is the caller saying "leave that where it is".
+	return c.put(ctx, "/api/v1/cron-triggers/"+url.PathEscape(id), cronTriggerUpdateRequest(u), nil)
+}
+
 // mcpItem is one entry of AInsel's MCP server registry. The list is a bare JSON array
 // rather than the paginated envelope every other collection uses.
 type mcpItem struct {

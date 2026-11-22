@@ -281,6 +281,16 @@ func roleInputSchema() map[string]any {
 				},
 				"additionalProperties": false,
 			},
+			"patrol": map[string]any{
+				"type":        "object",
+				"description": "The developer's scheduled PR patrol: how often it runs, and whether it runs at all. The developer's card only — the plan ignores it on the other two. Omit it to say nothing about the patrol, which on an edit is what leaves a schedule or a prompt retuned on the AInsel console untouched. An object naming only an interval retunes the cadence and leaves the patrol as enabled as the install has it.",
+				"properties": map[string]any{
+					"enabled":  map[string]any{"type": "boolean", "description": "False switches the hub's row off rather than deleting it: it stays on the Schedules UI with its last and next run, and nothing here re-enables it. Omit it to leave the enablement where the install left it."},
+					"interval": map[string]any{"type": "string", "description": "One of 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h, 6h, 8h, 12h. Anything else is refused by the plan: a step that divides neither 60 nor 24 is a cadence in name only."},
+					"schedule": map[string]any{"type": "string", "description": "A cron expression, for a cadence the list above cannot offer. It wins over interval. The hub validates it; this plugin only checks it is shaped like one."},
+				},
+				"additionalProperties": false,
+			},
 		},
 		"additionalProperties": false,
 	}
@@ -426,7 +436,54 @@ func roleInputsFromTool(req mcp.CallToolRequest) (map[setup.Role]setup.RoleInput
 		default:
 			return nil, fmt.Errorf("roles.%s.workingHours must be an object", key)
 		}
+		// The patrol is read the same way: an object or nothing, and nothing is the answer
+		// "say nothing about it" — which on an edit is what leaves a patrol retuned on the
+		// console alone. Whether any of it is a change is the plan's to decide, against the
+		// install row and not against the hub's live trigger.
+		switch patrol := fields["patrol"].(type) {
+		case nil:
+			// Omitted: the patrol stays as the install has it.
+		case map[string]any:
+			p, err := patrolFromTool(patrol, key)
+			if err != nil {
+				return nil, err
+			}
+			in.Patrol = p
+		default:
+			return nil, fmt.Errorf("roles.%s.patrol must be an object", key)
+		}
 		out[role] = in
+	}
+	return out, nil
+}
+
+// patrolFromTool reads one install's patrol answer: the tick and the cadence. A field that is
+// present but not the type it should be is refused here, where the caller can still fix the
+// argument; a cadence the plugin does not offer is the plan's block to name, the same refusal
+// the wizard's form gets. An absent enabled is left nil on purpose — it is the caller saying
+// "keep the enablement", not saying "switch it off".
+func patrolFromTool(fields map[string]any, role string) (*setup.PatrolInput, error) {
+	out := &setup.PatrolInput{}
+	if v, present := fields["enabled"]; present {
+		b, ok := v.(bool)
+		if !ok {
+			return nil, fmt.Errorf("roles.%s.patrol.enabled must be true or false", role)
+		}
+		out.Enabled = &b
+	}
+	for _, cadence := range []struct {
+		name string
+		into *string
+	}{{"interval", &out.Interval}, {"schedule", &out.Schedule}} {
+		v, present := fields[cadence.name]
+		if !present {
+			continue
+		}
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("roles.%s.patrol.%s must be a string", role, cadence.name)
+		}
+		*cadence.into = strings.TrimSpace(s)
 	}
 	return out, nil
 }

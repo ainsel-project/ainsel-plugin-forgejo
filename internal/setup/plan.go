@@ -71,6 +71,13 @@ const (
 	// agent — see changeOps.
 	FieldWorkingHours = "workingHours"
 
+	// FieldPatrol names the developer's scheduled PR patrol: its cadence and its
+	// enablement. They move as one field because they are one decision — whether this
+	// install goes looking for the pull requests nobody mentioned it about, and how
+	// often. The apply decides which half the hub is actually told about. It is diffed
+	// against the install row like the window above, for the same reason.
+	FieldPatrol = "patrol"
+
 	// FieldLLMOpenAIAuthMethod names the row that chooses how an OpenAI role
 	// authenticates: an API key or a ChatGPT sign-in finished in the console.
 	// It belongs to the openai provider alone, the way the vendor key rows
@@ -228,6 +235,14 @@ type RoleInput struct {
 	// install, and "keep what the install has" on an edit — never "reset to
 	// the default", which is what lets a hand-patched image value survive.
 	TurnTimeoutMs string
+
+	// Patrol is the developer's scheduled PR patrol: whether it runs, and how often.
+	// nil is "the admin said nothing about the patrol", which writes nothing — the same
+	// rule the turn timeout above runs on, and what lets a cadence an admin retuned on
+	// the hub's Schedules UI survive a re-apply made for another reason. Only the
+	// developer role's copy is read: the other two have no patrol to configure, so a
+	// value named on them is ignored rather than refused.
+	Patrol *PatrolInput
 
 	// LLMKey is the optional provider key the admin may type for the role in the
 	// wizard itself. It is a pass-through like the settings' key rows: it reaches
@@ -659,6 +674,29 @@ func Plan(in Input, snap Snapshot) Result {
 			block("role %q: %s", r, err.Error())
 		}
 
+		// The patrol belongs to the developer alone — a value named on another role is
+		// ignored rather than refused, because the wizard sends one shape of role card
+		// and the two cards with no patrol should not answer for one. An interval the
+		// plugin does not offer is refused here rather than at the hub: the MCP path has
+		// no wizard in front of it, and a cadence that cannot be rendered is not a
+		// preference. A cadence that can is merely expensive, and every fire is a model
+		// call, so the shortest ones the wizard offers come with the bill in them.
+		if r == RoleDeveloper && in.role(r).Patrol != nil {
+			if err := ValidatePatrol(in.role(r).Patrol); err != nil {
+				block("role %q: %s", r, err.Error())
+			} else {
+				last := (*Patrol)(nil)
+				if snap.Existing != nil {
+					last = snap.Existing.Roles[r].Patrol
+				}
+				if eff := patrolFor(last, in.role(r).Patrol); eff.Enabled {
+					if mins, ok := patrolIntervalMinutes(eff.Schedule); ok && mins < minWarnedPatrolMinutes {
+						warn("role %q: a PR patrol every %d minutes is up to %d model calls a day on this install", r, mins, 1440/mins)
+					}
+				}
+			}
+		}
+
 		// A wizard-set turn timeout is a wall-clock ceiling the runner enforces, so a
 		// nonsense one is not a preference — it is an install whose turns either die
 		// in seconds or never time out. Block on it, the same way a missing runtime
@@ -774,6 +812,12 @@ func wantedInstall(in Input, snap Snapshot) Install {
 				ImageID:  st.ImageID,
 				BotLogin: st.BotLogin,
 				Tools:    effectiveTools(r, in, snap),
+				// The patrol the install is about to hold: the form's answer
+				// rendered over the row's, or the row's own when the form said
+				// nothing. CronTriggers reads this, which is what keeps a patrol
+				// switched off out of the plan's preview instead of showing up as
+				// something to create.
+				Patrol: patrolFor(st.Patrol, in.role(r).Patrol),
 			}
 		}
 		return want
@@ -782,6 +826,7 @@ func wantedInstall(in Input, snap Snapshot) Install {
 		want.Roles[r] = RoleState{
 			BotLogin: BotLogin(r, slug),
 			Tools:    effectiveTools(r, in, snap),
+			Patrol:   patrolFor(nil, in.role(r).Patrol),
 		}
 	}
 	return want
@@ -979,6 +1024,21 @@ func changeOps(in Input, snap Snapshot, want Install) []Op {
 				Detail: diff("working hours", anyHoursText(was), anyHoursText(now)),
 				Role:   r, Field: FieldWorkingHours,
 			})
+		}
+
+		// The patrol, for the developer alone, and for the reason the window just
+		// above gives: diffed against what the wizard last wrote, never against the
+		// live cron trigger, because a live diff is how a cadence an admin retuned on
+		// the hub's Schedules UI gets written back over by an apply that came for
+		// something else entirely.
+		if r == RoleDeveloper {
+			if d := CronPatrolDiff(ex.Roles[r].Patrol, in.role(r).Patrol); d.Changed {
+				ops = append(ops, Op{
+					Kind: KindCronTrigger, Name: CronPatrolName(ex.Slug),
+					Detail: diff("patrol", PatrolSummary(d.From), PatrolSummary(d.To)),
+					Role:   r, Field: FieldPatrol,
+				})
+			}
 		}
 	}
 

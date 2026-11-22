@@ -44,16 +44,45 @@ const CronPatrolPrompt = "Scheduled PR patrol. List the open pull requests autho
 // the developer's scheduled PR patrol, named forgejo-developer-pr-patrol-<slug>
 // the way the event triggers are named (R3). Like them it is not stored on the
 // install row; it is recognised by name.
+//
+// It reads the row's patrol, though, because this function is what both the re-apply
+// loop and the apply's create path build from: a row written before the patrol was a
+// choice says nothing and gets the shipped cadence, and one switched off gets no
+// trigger at all. That is the whole of why a patrol an admin turned off in the wizard
+// is not re-filed by the next pass — and, with the diff's row baseline, why one they
+// retuned on the hub's Schedules UI is not fought either.
 func CronTriggers(in Install) []CronTrigger {
+	want := PatrolWanted(in.Roles[RoleDeveloper].Patrol)
+	if !want.Enabled {
+		return nil
+	}
+	schedule := want.Schedule
+	if schedule == "" {
+		schedule = CronPatrolSchedule
+	}
 	return []CronTrigger{
 		{
 			Name:     CronPatrolName(in.Slug),
 			AgentRef: in.Roles[RoleDeveloper].AgentID,
-			Schedule: CronPatrolSchedule,
+			Schedule: schedule,
 			Prompt:   CronPatrolPrompt,
 			Enabled:  true,
 		},
 	}
+}
+
+// CronTriggerUpdate is the write one scheduled prompt that already exists takes: the
+// fields the install means to move, with a nil meaning "say nothing" rather than "clear".
+// The hub's update takes the name, the agent and the prompt on every write, so a caller
+// that means to retune a cadence sends the row's own three back — which is also what keeps
+// a prompt an admin edited on the hub's Schedules UI from being restored to the shipped one
+// by a change to nothing of the sort.
+type CronTriggerUpdate struct {
+	Name     string
+	AgentRef string
+	Prompt   string
+	Schedule *string
+	Enabled  *bool
 }
 
 // CronPatrolName names the install's PR-patrol cron trigger,

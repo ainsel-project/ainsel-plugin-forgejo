@@ -65,9 +65,13 @@ type Client interface {
 	// scheduled prompts — the developer's PR patrol. A cron trigger has no
 	// connector: the hub lists them all (optionally filtered by agent), ids are
 	// generated on create, and the install recognises its own by name — so a
-	// delete takes the id a list carried, never the name.
+	// delete takes the id a list carried, never the name. UpdateCronTrigger writes the
+	// two halves the wizard owns on a trigger that already exists — its cadence and
+	// whether it is allowed to fire — and says nothing about the rest, which is what
+	// keeps a prompt an admin edited on the hub's Schedules UI out of the write.
 	ListCronTriggers(ctx context.Context) ([]setup.CronTrigger, error)
 	CreateCronTrigger(ctx context.Context, groupID string, ct setup.CronTrigger) (Ref, error)
+	UpdateCronTrigger(ctx context.Context, id string, u CronTriggerUpdate) error
 	DeleteCronTrigger(ctx context.Context, id string) error
 
 	// ListMCPServers and RegisterMCPServer are the forge's own MCP server, the one
@@ -152,6 +156,21 @@ type Client interface {
 
 	// PluginGroups returns the group ids the plugin has access to.
 	PluginGroups(ctx context.Context) ([]string, error)
+}
+
+// CronTriggerUpdate is one cron trigger write: the fields the caller means to move, with
+// a nil meaning "say nothing" rather than "clear" — the same three states
+// WorkingHoursWrite spells out, and for the same reason. An omitted field the hub read as
+// a clear would let an update that meant to retune a cadence switch the patrol off.
+//
+// The hub's update takes the name, the agent and the prompt on every write, so a caller
+// that means to move only the cadence sends the row's own three back.
+type CronTriggerUpdate struct {
+	Name     string
+	AgentRef string
+	Prompt   string
+	Schedule *string
+	Enabled  *bool
 }
 
 // LLMCheckPair names one provider and model together — the unit the reachability

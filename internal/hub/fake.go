@@ -97,8 +97,8 @@ type Fake struct {
 	// same fake reads what the first pass wrote instead of the original drift.
 	SeedPersonas map[string]Persona
 
-	// UpdateErr, when set, fails every UpdateAgent, UpdatePersona and
-	// SetImageTools call: the hub refusing a write the plugin is entitled to
+	// UpdateErr, when set, fails every UpdateAgent, UpdatePersona, SetImageTools and
+	// UpdateCronTrigger call: the hub refusing a write the plugin is entitled to
 	// make is what a caller must survive as a warning rather than a halt.
 	// RegisterErr does the same for RegisterMCPServer.
 	UpdateErr   error
@@ -118,6 +118,11 @@ type Fake struct {
 	DeletedTriggers     []string
 	DeletedCronTriggers []string
 	UpdatedAgents       []UpdatedAgent
+
+	// UpdatedCronTriggers records each UpdateCronTrigger call — the row it addressed
+	// and the halves it moved — which is what a patrol test reads instead of trusting
+	// the row's own claim about what it wrote.
+	UpdatedCronTriggers []UpdatedCronTrigger
 	PersonaUpdates      []UpdatedPersona
 	RotatedConnectors   []string
 	SeedEvents          []Event
@@ -209,6 +214,13 @@ type UpdatedImage struct {
 type UpdatedAgent struct {
 	ID     string
 	Update AgentUpdate
+}
+
+// UpdatedCronTrigger is one UpdateCronTrigger call: the cron trigger it was addressed
+// to and the write it carried.
+type UpdatedCronTrigger struct {
+	ID     string
+	Update CronTriggerUpdate
 }
 
 // UpdatedPersona is one UpdatePersona call: the persona and the text it was given.
@@ -431,6 +443,32 @@ func (f *Fake) CreateCronTrigger(ctx context.Context, groupID string, ct setup.C
 	created.ID = ref.ID
 	f.CronTriggers = append(f.CronTriggers, created)
 	return ref, nil
+}
+
+func (f *Fake) UpdateCronTrigger(ctx context.Context, id string, u CronTriggerUpdate) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record("UpdateCronTrigger")
+
+	if f.UpdateErr != nil {
+		return f.UpdateErr
+	}
+	f.UpdatedCronTriggers = append(f.UpdatedCronTriggers, UpdatedCronTrigger{ID: id, Update: u})
+	// The write persists, as a create's does: a later ListCronTriggers answers with
+	// what a real hub would now hold, which is what lets a test run a second pass and
+	// assert the patrol is left alone.
+	for i, ct := range f.CronTriggers {
+		if ct.ID != id {
+			continue
+		}
+		if u.Schedule != nil {
+			f.CronTriggers[i].Schedule = *u.Schedule
+		}
+		if u.Enabled != nil {
+			f.CronTriggers[i].Enabled = *u.Enabled
+		}
+	}
+	return nil
 }
 
 func (f *Fake) DeleteCronTrigger(ctx context.Context, id string) error {

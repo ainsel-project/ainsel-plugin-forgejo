@@ -139,6 +139,26 @@ func (a *hubAdapter) CreateCronTrigger(ctx context.Context, groupID string, trig
 	return ref.ID, err
 }
 
+// ListCronTriggers is the read an edit of the patrol needs: the row the install already
+// has on the hub, id and all, since a write takes the generated id and a display name is
+// not a lookup.
+func (a *hubAdapter) ListCronTriggers(ctx context.Context) ([]setup.CronTrigger, error) {
+	return a.h.ListCronTriggers(ctx)
+}
+
+// UpdateCronTrigger writes the patrol's cadence and enablement. The three fields the hub
+// requires on every write are the caller's to fill — which is the point: an apply that
+// came to switch the patrol off sends the prompt the hub holds rather than the shipped one.
+func (a *hubAdapter) UpdateCronTrigger(ctx context.Context, cronTriggerID string, update setup.CronTriggerUpdate) error {
+	return a.h.UpdateCronTrigger(ctx, cronTriggerID, hub.CronTriggerUpdate{
+		Name:     update.Name,
+		AgentRef: update.AgentRef,
+		Prompt:   update.Prompt,
+		Schedule: update.Schedule,
+		Enabled:  update.Enabled,
+	})
+}
+
 func (a *hubAdapter) DeleteCronTrigger(ctx context.Context, cronTriggerID string) error {
 	return a.h.DeleteCronTrigger(ctx, cronTriggerID)
 }

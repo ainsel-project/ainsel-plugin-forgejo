@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ainsel-project/ainsel-plugin-forgejo/compare/v0.2.0...v0.3.0) (2026-11-22)
+
+
+### Features
+
+* make the PR patrol cadence one global setting, 10 minutes to 24 hours ([#16](https://github.com/ainsel-project/ainsel-plugin-forgejo/issues/16)) ([7b4b7b1](https://github.com/ainsel-project/ainsel-plugin-forgejo/commit/7b4b7b1761a99d7e5d5974ee4f1b2f4c1eb1ce62))
+
 ## [0.2.0](https://github.com/ainsel-project/ainsel-plugin-forgejo/compare/v0.1.0...v0.2.0) (2026-11-22)
 
 

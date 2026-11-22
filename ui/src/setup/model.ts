@@ -4,9 +4,9 @@
 // decision 9): the wizard collects only per-install facts. The forge MCP URL and the
 // role LLMs left for the settings store; the forge-MCP pick step went with them.
 
-import type { WorkingHours } from "../api";
+import type { Patrol, PatrolInput, WorkingHours } from "../api";
 
-export type { WorkingHours };
+export type { Patrol, PatrolInput, WorkingHours };
 
 export type SetupStep = "installs" | "instance" | "accounts" | "roles" | "rules" | "preview" | "connect" | "done";
 
@@ -23,6 +23,13 @@ export interface RoleInput {
   // set in the AInsel console sitting where they left it. Setting one here and then clearing
   // it is the only way the wizard ever asks the hub to remove one.
   workingHours?: WorkingHours;
+  // The developer's scheduled PR patrol: how often it runs, and whether it runs at all.
+  // Undefined means "the admin said nothing about the patrol", so the plan draws no op for it and
+  // the apply neither retunes it nor switches it off — which is what leaves a patrol an admin set
+  // on the AInsel console where they left it. Unlike the window above, an explicit answer here is
+  // never a delete: switching the patrol off writes the hub row's `enabled: false`, so its prompt
+  // and its history survive and the tick can be moved back.
+  patrol?: PatrolInput;
   // The role image's TURN_TIMEOUT_MS in milliseconds, as a decimal string — the
   // unit the wire, the env var and the hub all speak; the field on S4 takes
   // minutes and converts (issue #61). Empty means the shipped default on a new
@@ -74,6 +81,92 @@ export function newRoleInput(): RoleInput {
     tools: [],
     turnTimeoutMs: "",
   };
+}
+
+// The cadences the wizard offers for the patrol, smallest first — and they are the validation, on
+// the server and here. Every minute value divides 60 and every hour value divides 24, and that is
+// not a matter of taste: a cron step counts from zero within its unit and resets at the top of it,
+// so `*/45 * * * *` fires at :00 and :45 and starts over — a 45/15 loop wearing a normal-looking
+// expression. A cadence the list cannot offer is typed into the expression box instead, where the
+// hub is the one that says whether it means what the admin thinks.
+export const PATROL_INTERVALS = [
+  "1m", "2m", "3m", "4m", "5m", "6m", "10m", "12m", "15m", "20m", "30m",
+  "1h", "2h", "3h", "4h", "6h", "8h", "12h",
+];
+
+// The patrol's shipped cadence — what an install that never chose runs at, and what an empty
+// expression box means. The server owns this value; the field's placeholder shows it.
+export const PATROL_DEFAULT_SCHEDULE = "*/30 * * * *";
+
+// patrolScheduleFor is setup.PatrolSchedule, mirrored: the chip rendered as the cron expression it
+// means. A step of one is not a step — `*` and `0 * * * *` are what a reader recognises on the
+// hub's Schedules UI. An interval the list does not offer renders as nothing at all, which is how
+// the form refuses one without a second list of what is bad.
+export function patrolScheduleFor(interval: string): string {
+  if (!PATROL_INTERVALS.includes(interval)) return "";
+  const n = Number(interval.slice(0, -1));
+  if (n === 1) return interval.endsWith("h") ? "0 * * * *" : "* * * * *";
+  return interval.endsWith("h") ? `0 */${n} * * *` : `*/${n} * * * *`;
+}
+
+// patrolIntervalFor is the reading back: the chip an expression means, or "" when no chip does —
+// which is the honest answer for a hand-typed expression, and the reason the box exists.
+export function patrolIntervalFor(schedule: string): string {
+  if (!schedule) return "";
+  return PATROL_INTERVALS.find((iv) => patrolScheduleFor(iv) === schedule) ?? "";
+}
+
+// patrolIntervalMinutes is how often a cadence fires, in minutes, or 0 for a cadence no chip
+// offers. The form's cost hint reads it; a hand-typed expression gets no hint, because this plugin
+// does not own cron's grammar and will not guess at what an expression means.
+export function patrolIntervalMinutes(schedule: string): number {
+  const iv = patrolIntervalFor(schedule);
+  if (!iv) return 0;
+  const n = Number(iv.slice(0, -1));
+  return iv.endsWith("h") ? n * 60 : n;
+}
+
+// The cadence below which the form says what it costs, mirroring the plan's warning: every fire is
+// a model call against the install's model, so the shortest thing on offer is 1 440 wakes a day.
+export const PATROL_WARN_MINUTES = 10;
+
+// patrolScheduleOf is the cadence the form's answer leaves in force: the expression box wins over
+// a chip, a chip renders, and neither keeps whatever the install was running — which is what an
+// answer that only moved the tick means. Empty on the end of that reads as the shipped cadence.
+export function patrolScheduleOf(p: PatrolInput | undefined): string {
+  if (!p) return PATROL_DEFAULT_SCHEDULE;
+  if (p.schedule) return p.schedule;
+  if (p.interval) return patrolScheduleFor(p.interval) || PATROL_DEFAULT_SCHEDULE;
+  return p.schedule || PATROL_DEFAULT_SCHEDULE;
+}
+
+// patrolEnabledOf is whether the patrol is meant to fire at all: the tick if the form moved it,
+// and otherwise the state the install row prefilled — running, for an install that never chose.
+export function patrolEnabledOf(p: PatrolInput | undefined): boolean {
+  return p?.enabled ?? true;
+}
+
+// patrolCadenceText names a cadence the way an admin would: the chip when one means it, and the
+// expression itself when none does.
+export function patrolCadenceText(schedule: string): string {
+  const iv = patrolIntervalFor(schedule);
+  return iv ? `every ${iv}` : `cron ${schedule}`;
+}
+
+// patrolSummary is the form's one-line reading of the patrol, in the same words the plan's preview
+// uses — "on, every 30m" — so what the admin reads while choosing is what the plan will name on
+// the op. It reads the form's answer, which on an edit starts as the row's own.
+export function patrolSummary(p: PatrolInput | undefined): string {
+  return `${patrolEnabledOf(p) ? "on" : "off"}, ${patrolCadenceText(patrolScheduleOf(p))}`;
+}
+
+// patrolCost is the form's warning about a cadence that is very short, or "" for one that is not.
+// The plan warns in the same breath; the field says it where the choice is made.
+export function patrolCost(p: PatrolInput | undefined): string {
+  if (!patrolEnabledOf(p)) return "";
+  const mins = patrolIntervalMinutes(patrolScheduleOf(p));
+  if (!mins || mins >= PATROL_WARN_MINUTES) return "";
+  return `A patrol every ${mins} minutes is up to ${Math.floor(1440 / mins)} model calls a day on this install.`;
 }
 
 // The window a role starts with when the admin asks for one: a working week, in UTC until they

@@ -142,6 +142,31 @@ export interface WorkingHours {
   end: string;
 }
 
+// Patrol is the developer's scheduled PR patrol as the install row remembers it: whether the
+// wizard last left it running, and at what cadence. Like the window above it is the record of what
+// the wizard wrote and not a reading of the hub — the wizard diffs the form against this, which is
+// what lets a cadence or a prompt an admin retuned on the AInsel console's Schedules UI survive a
+// re-apply made for another reason. Absent means the wizard never wrote one, which reads as the
+// patrol running at the shipped cadence.
+export interface Patrol {
+  enabled: boolean;
+  // The wizard's spelling of the cadence ("30m", "2h"), "" for a hand-typed expression. It is
+  // display state for the chip, never the basis of a diff.
+  interval?: string;
+  // The cron expression the install was last told to run the patrol at. Empty means the shipped
+  // one, `*/30 * * * *`.
+  schedule?: string;
+}
+
+// PatrolInput is the same choice on the way in. `enabled` is optional because the caller can mean
+// three things by it: a tick box sends true or false, and a caller that only wants the cadence
+// leaves it out, so the patrol keeps whatever enablement the install has.
+export interface PatrolInput {
+  enabled?: boolean;
+  interval?: string;
+  schedule?: string;
+}
+
 export interface RoleState {
   agentId: string;
   imageId: string;
@@ -154,6 +179,10 @@ export interface RoleState {
   // an admin set in the AInsel console is not read into here, so it is never compared and
   // never overwritten. Absent means the wizard never set one.
   workingHours?: WorkingHours;
+  // The developer's patrol as the wizard last wrote it — and only ever on the developer's row.
+  // Absent means the wizard never set one, which is what every install written before the option
+  // says, and reads as the patrol running every 30 minutes.
+  patrol?: Patrol;
   // The TURN_TIMEOUT_MS the role image was last written with, in milliseconds
   // (issue #61). Empty on rows written before the option existed — the edit
   // field then starts empty, which means "keep what the image has".
@@ -256,6 +285,10 @@ export interface RoleInputRequest {
   // Sent only when the admin asked for a window. Left out, the plan has no op for the field
   // and the apply writes neither a window nor a clear.
   workingHours?: WorkingHours;
+  // Sent only when the admin said something about the patrol. Left out, the plan draws no op for
+  // it and the apply neither retunes it nor switches it off — which is what leaves a patrol an
+  // admin set on the AInsel console alone.
+  patrol?: PatrolInput;
   // Milliseconds as a decimal string; empty means the shipped default on a
   // create and "keep" on an edit (issue #61).
   turnTimeoutMs?: string;

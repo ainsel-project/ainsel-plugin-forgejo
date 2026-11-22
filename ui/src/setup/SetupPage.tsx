@@ -183,6 +183,19 @@ export function SetupPage() {
                 }
               : undefined,
             turnTimeoutMs: roleState.turnTimeoutMs || "",
+            // The patrol comes off the row and only off it, the same rule as the window above: the
+            // row records what the wizard last wrote, which is what the plan diffs the form against.
+            // A cadence an admin retuned on the AInsel console's Schedules UI is never read into the
+            // form, so it is never compared and never written back. A row with no patrol — every
+            // install written before the option — leaves the field untouched, which draws no op.
+            // Copied rather than shared, so the form moves its own values.
+            patrol: roleState.patrol
+              ? {
+                  enabled: roleState.patrol.enabled,
+                  interval: roleState.patrol.interval || "",
+                  schedule: roleState.patrol.schedule || "",
+                }
+              : undefined,
           };
         }
       }

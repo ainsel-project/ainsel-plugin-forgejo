@@ -1152,3 +1152,76 @@ describe("SettingsPage (managed resources)", () => {
     expect(screen.getByLabelText("Model")).toBeTruthy();
   });
 });
+
+// The developer's PR patrol is one plugin-wide setting: two rows on the developer's role, nothing on
+// the other two, served with the cadences the plugin offers — ten minutes to a day.
+describe("SettingsPage (the PR patrol)", () => {
+  const INTERVALS = ["10m", "12m", "15m", "20m", "30m", "1h", "2h", "3h", "4h", "6h", "8h", "12h", "24h"];
+  const patrolRows = (): Setting[] => [
+    {
+      role: "developer",
+      field: "patrolEnabled",
+      value: "true",
+      dirty: false,
+      default: "true",
+      defaultVersion: RUNNING_VERSION,
+      options: [
+        { value: "true", label: "On" },
+        { value: "false", label: "Off" },
+      ],
+    },
+    {
+      role: "developer",
+      field: "patrolInterval",
+      value: "30m",
+      dirty: false,
+      default: "30m",
+      defaultVersion: RUNNING_VERSION,
+      options: INTERVALS.map((value) => ({ value, label: `every ${value}` })),
+    },
+  ];
+
+  it("offers the patrol on the developer's role alone", async () => {
+    mockSettingsGet({}, patrolRows());
+    await renderLoaded();
+
+    expect(screen.queryByRole("heading", { name: "PR patrol" })).toBeNull();
+    fireEvent.click(roleNav("Developer"));
+    expect(screen.getByRole("heading", { name: "PR patrol" })).toBeTruthy();
+    expect(screen.getByLabelText("Patrol")).toBeTruthy();
+    expect(screen.getByLabelText("How often")).toBeTruthy();
+    // Known fields have a card: nothing lands under Other.
+    expect(screen.queryByRole("heading", { name: "Other" })).toBeNull();
+
+    fireEvent.click(roleNav("Reviewer"));
+    expect(screen.queryByRole("heading", { name: "PR patrol" })).toBeNull();
+  });
+
+  it("lists every cadence from ten minutes to a day and nothing else", async () => {
+    mockSettingsGet({}, patrolRows());
+    await renderLoaded();
+    fireEvent.click(roleNav("Developer"));
+
+    const select = screen.getByLabelText("How often") as HTMLSelectElement;
+    expect(select.value).toBe("30m");
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(INTERVALS);
+  });
+
+  it("saves a changed cadence as the developer's patrolInterval", async () => {
+    mockSettingsGet({}, patrolRows());
+    put.mockImplementation(async (_path: string, body: any) => ({
+      settings: afterBatch(makeSettings({}, patrolRows()), body.settings),
+    }));
+    await renderLoaded();
+    fireEvent.click(roleNav("Developer"));
+
+    fireEvent.change(screen.getByLabelText("How often"), { target: { value: "24h" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(put).toHaveBeenCalledWith("/settings", {
+        settings: [{ role: "developer", field: "patrolInterval", value: "24h" }],
+      });
+    });
+  });
+});

@@ -41,13 +41,16 @@ func TestAllResolvesDefaultsFromContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("All: %v", err)
 	}
-	if len(out) != len(Roles)*len(Fields) {
-		t.Fatalf("All returned %d settings, want %d", len(out), len(Roles)*len(Fields))
+	if len(out) != gridSize() {
+		t.Fatalf("All returned %d settings, want %d", len(out), gridSize())
 	}
 
 	i := 0
 	for _, role := range Roles {
 		for _, field := range Fields {
+			if !Applies(role, field) {
+				continue
+			}
 			set := out[i]
 			i++
 			if set.Role != string(role) || set.Field != field {
@@ -103,10 +106,19 @@ func TestSaveRoundTripAcrossReopen(t *testing.T) {
 	}
 
 	want := map[string]string{}
-	edits := make([]Edit, 0, len(Roles)*len(Fields))
+	edits := make([]Edit, 0, gridSize())
 	for _, role := range Roles {
 		for _, field := range Fields {
+			if !Applies(role, field) {
+				continue
+			}
 			value := "edited-" + string(role) + "-" + field
+			if field == FieldPatrolEnabled {
+				value = PatrolOff
+			}
+			if field == FieldPatrolInterval {
+				value = "6h"
+			}
 			if field == FieldSkillText {
 				value = editedSkill(role)
 			}
@@ -415,8 +427,8 @@ func TestSaveAcceptsEveryListedProvider(t *testing.T) {
 func TestAllServesProviderOptionsOnTheProviderRows(t *testing.T) {
 	s := openStore(t)
 	rows := mustAll(t, s)
-	if len(rows) != len(Roles)*len(Fields) {
-		t.Fatalf("All answered with %d rows, want %d", len(rows), len(Roles)*len(Fields))
+	if len(rows) != gridSize() {
+		t.Fatalf("All answered with %d rows, want %d", len(rows), gridSize())
 	}
 	for _, set := range rows {
 		if set.Field == FieldLLMOpenAIAuthMethod {
@@ -425,6 +437,17 @@ func TestAllServesProviderOptionsOnTheProviderRows(t *testing.T) {
 			if len(set.Options) != len(LLMAuthMethods) {
 				t.Errorf("%s.%s offers %d options, want the %d listed methods",
 					set.Role, set.Field, len(set.Options), len(LLMAuthMethods))
+			}
+			continue
+		}
+		if set.Field == FieldPatrolEnabled || set.Field == FieldPatrolInterval {
+			// The patrol's two dropdowns: on/off, and the plugin's offered cadences.
+			want := 2
+			if set.Field == FieldPatrolInterval {
+				want = len(setup.PatrolIntervals)
+			}
+			if len(set.Options) != want {
+				t.Errorf("%s.%s offers %d options, want %d", set.Role, set.Field, len(set.Options), want)
 			}
 			continue
 		}
@@ -842,12 +865,28 @@ func truncate(s string) string {
 // defaults. Rows are seeded first (un-dirty, at the running version), since
 // Open writes nothing until a Save does; tests add their own edits before
 // calling, and the rewind moves everything, edited rows included.
+// gridSize is how many rows the registry answers with: every role × every field the role has.
+func gridSize() int {
+	n := 0
+	for _, role := range Roles {
+		for _, field := range Fields {
+			if Applies(role, field) {
+				n++
+			}
+		}
+	}
+	return n
+}
+
 func staleEveryRow(t *testing.T, s *Store, version string) {
 	t.Helper()
 	ctx := context.Background()
 	var edits []Edit
 	for _, role := range Roles {
 		for _, field := range Fields {
+			if !Applies(role, field) {
+				continue
+			}
 			edits = append(edits, Edit{Role: string(role), Field: field, Reset: true})
 		}
 	}
@@ -896,7 +935,7 @@ func TestAdoptDefaultsMovesUntouchedStaleRows(t *testing.T) {
 		t.Fatalf("AdoptDefaults: %v", err)
 	}
 
-	total := len(Roles)*len(Fields) - 4*len(Roles)
+	total := gridSize() - 4*len(Roles)
 	if len(adopted) != total-1 {
 		t.Fatalf("adopted %d rows, want %d (everything but the edited one, and but the key rows — those are the migration's, not adoption's)", len(adopted), total-1)
 	}
@@ -914,6 +953,9 @@ func TestAdoptDefaultsMovesUntouchedStaleRows(t *testing.T) {
 	// in the database, not only in the read.
 	for _, role := range Roles {
 		for _, field := range Fields {
+			if !Applies(role, field) {
+				continue
+			}
 			if role == "refiner" && field == FieldLLMModel {
 				continue
 			}
@@ -1151,5 +1193,54 @@ func TestAuthMethodDefaultIsTheAPIKey(t *testing.T) {
 	}
 	if set.Options[0].Value != setup.LLMAuthMethodAPIKey {
 		t.Errorf("first option = %q, want the default to lead the list", set.Options[0].Value)
+	}
+}
+
+// TestPatrolFieldsExistForTheDeveloperAlone: the patrol is one plugin-wide setting held on the
+// developer role, so the registry answers it for that role only, with the shipped defaults.
+func TestPatrolFieldsExistForTheDeveloperAlone(t *testing.T) {
+	s := openStore(t)
+	for _, set := range mustAll(t, s) {
+		if set.Field != FieldPatrolEnabled && set.Field != FieldPatrolInterval {
+			continue
+		}
+		if set.Role != string(setup.RoleDeveloper) {
+			t.Errorf("%s.%s is answered; the patrol is the developer's alone", set.Role, set.Field)
+		}
+	}
+	ctx := context.Background()
+	if v, err := s.Effective(ctx, setup.RoleDeveloper, FieldPatrolEnabled); err != nil || v != PatrolOn {
+		t.Errorf("patrolEnabled default = %q, %v, want %q", v, err, PatrolOn)
+	}
+	if v, err := s.Effective(ctx, setup.RoleDeveloper, FieldPatrolInterval); err != nil || v != "30m" {
+		t.Errorf("patrolInterval default = %q, %v, want 30m", v, err)
+	}
+}
+
+// TestSaveRefusesAPatrolOutsideTenMinutesToADay: the write path holds the list the dropdown
+// offers — nothing under ten minutes, nothing over a day, nothing off the even beats — and
+// refuses the patrol on a role that has none.
+func TestSaveRefusesAPatrolOutsideTenMinutesToADay(t *testing.T) {
+	s := openStore(t)
+	ctx := context.Background()
+	for _, bad := range []string{"1m", "5m", "9m", "45m", "5h", "25h", "48h", "", "often"} {
+		err := s.Save(ctx, []Edit{{Role: "developer", Field: FieldPatrolInterval, Value: bad}})
+		var verr *ValidationError
+		if !errors.As(err, &verr) {
+			t.Errorf("Save(patrolInterval=%q) = %v, want a refusal", bad, err)
+		}
+	}
+	for _, good := range setup.PatrolIntervals {
+		if err := s.Save(ctx, []Edit{{Role: "developer", Field: FieldPatrolInterval, Value: good}}); err != nil {
+			t.Errorf("Save(patrolInterval=%q): %v", good, err)
+		}
+	}
+	if err := s.Save(ctx, []Edit{{Role: "developer", Field: FieldPatrolEnabled, Value: "maybe"}}); err == nil {
+		t.Error("Save(patrolEnabled=maybe) = nil, want a refusal")
+	}
+	for _, role := range []string{"refiner", "reviewer"} {
+		if err := s.Save(ctx, []Edit{{Role: role, Field: FieldPatrolInterval, Value: "1h"}}); err == nil {
+			t.Errorf("Save(%s.patrolInterval) = nil, want a refusal: only the developer has a patrol", role)
+		}
 	}
 }

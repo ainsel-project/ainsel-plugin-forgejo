@@ -89,11 +89,6 @@ func (f *filler) fill(t *testing.T, v reflect.Value, path string) {
 			Start:    "09:00",
 			End:      "17:00",
 		}))
-	case reflect.TypeOf((*setup.Patrol)(nil)):
-		// The patrol the wizard last wrote: off, and at a cadence that is not the shipped
-		// one, so the round trip shows both halves survive rather than that a zero value
-		// happened to match.
-		v.Set(reflect.ValueOf(&setup.Patrol{Enabled: false, Interval: "2h", Schedule: "0 */2 * * *"}))
 	case reflect.TypeOf(map[setup.Role]setup.RoleState{}):
 		m := reflect.MakeMap(v.Type())
 		for _, role := range []setup.Role{setup.RoleRefiner, setup.RoleDeveloper, setup.RoleReviewer} {

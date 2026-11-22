@@ -155,6 +155,22 @@ const GROUPS: { title: string; desc: string; fields: FieldSpec[] }[] = [
     ],
   },
   {
+    title: "PR patrol",
+    desc: "How the developer goes looking for pull requests nobody mentioned it about. One setting for every install: each patrol trigger is held to it.",
+    fields: [
+      {
+        field: "patrolEnabled",
+        label: "Patrol",
+        help: "Off switches the patrol triggers off rather than deleting them: they stay on the AInsel console's Schedules UI and can be switched back on here.",
+      },
+      {
+        field: "patrolInterval",
+        label: "How often",
+        help: "From every 10 minutes to every 24 hours. Every run is a model call on each install, so a short cadence is a long bill.",
+      },
+    ],
+  },
+  {
     title: "Forge connection",
     desc: "How agents reach Forgejo. Per-install MCP servers point here.",
     fields: [

@@ -14,7 +14,7 @@ func TestCronTriggersShape(t *testing.T) {
 			RoleReviewer:  {AgentID: "a-reviewer"},
 		},
 	}
-	got := CronTriggers(in)
+	got := CronTriggers(in, DefaultPatrolSpec())
 	if len(got) != 1 {
 		t.Fatalf("got %d cron triggers, want exactly 1", len(got))
 	}
@@ -64,7 +64,7 @@ func TestCronMissingMatchesByName(t *testing.T) {
 	want := CronTriggers(Install{
 		Slug:  "apps",
 		Roles: map[Role]RoleState{RoleDeveloper: {AgentID: "a-developer"}},
-	})
+	}, DefaultPatrolSpec())
 
 	// Nothing existing: everything is missing.
 	if got := CronMissing(want, nil); len(got) != 1 {
@@ -91,5 +91,25 @@ func TestCronMissingMatchesByName(t *testing.T) {
 	// Idempotent on re-run: the same inputs answer the same way twice.
 	if got := CronMissing(want, existing); len(got) != 0 {
 		t.Errorf("second CronMissing = %d, want 0", len(got))
+	}
+}
+
+// TestCronTriggersCarriesTheSpec: the patrol is the plugin-wide setting's, so the trigger is
+// built from the spec it is handed — its cadence, and whether it may fire. A spec that is off
+// still files the trigger, disabled, so it stays on the hub's Schedules UI.
+func TestCronTriggersCarriesTheSpec(t *testing.T) {
+	in := Install{Slug: "apps", Roles: map[Role]RoleState{RoleDeveloper: {AgentID: "a-developer"}}}
+
+	got := CronTriggers(in, PatrolSpec{Enabled: false, Schedule: "0 */6 * * *"})
+	if len(got) != 1 {
+		t.Fatalf("got %d cron triggers, want 1", len(got))
+	}
+	if got[0].Schedule != "0 */6 * * *" || got[0].Enabled {
+		t.Errorf("trigger = %+v, want a disabled patrol on 0 */6 * * *", got[0])
+	}
+
+	// An empty schedule is the shipped one, never an empty string the hub would refuse.
+	if got := CronTriggers(in, PatrolSpec{Enabled: true}); got[0].Schedule != CronPatrolSchedule {
+		t.Errorf("schedule = %q, want the shipped %q", got[0].Schedule, CronPatrolSchedule)
 	}
 }

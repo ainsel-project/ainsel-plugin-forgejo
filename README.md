@@ -47,7 +47,7 @@ Full walkthrough, screen by screen: [`docs/setup.md`](docs/setup.md).
 | `forgejo-<role>-<what>-<slug>` | the six event triggers: refiner × issue opened, issue reopened and mention; reviewer × pull request opened and mention; developer × mention. |
 | `forgejo-developer-pr-patrol-<slug>` | the seventh: a cron trigger that wakes the developer to check its open pull requests — at most two repositories per run — for unaddressed review comments, failing CI and merge conflicts, and to post nothing when nothing changed. Its cadence is the wizard's to set, from every minute to every twelve hours or an expression of your own, and it can be switched off; the shipped answer is every 30 minutes. |
 
-Plus, in the plugin's own database, one install row: the ids of everything above, the bot logins, the exclude label, the three tool sets, the patrol's cadence, when the webhook was last verified and which event families have arrived. It holds no secret.
+Plus, in the plugin's own database, one install row: the ids of everything above, the bot logins, the exclude label, the three tool sets, when the webhook was last verified and which event families have arrived. It holds no secret.
 
 ## Credentials and access
 

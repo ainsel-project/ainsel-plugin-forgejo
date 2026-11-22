@@ -521,6 +521,8 @@ func reconcileScopeFor(field string) reconcile.Scope {
 		return reconcile.ScopeAgent
 	case settings.FieldMCPUrl, settings.FieldMCPTokenFromEnv:
 		return reconcile.ScopeMCPServer
+	case settings.FieldPatrolEnabled, settings.FieldPatrolInterval:
+		return reconcile.ScopeTrigger
 	default:
 		return reconcile.ScopeNone
 	}

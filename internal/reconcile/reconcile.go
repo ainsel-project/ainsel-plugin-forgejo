@@ -480,6 +480,10 @@ type desiredState struct {
 	// field lives per role, but an install has one forge MCP server.
 	mcpURL      string
 	mcpTokenEnv string
+
+	// patrol is the developer's PR patrol, the one plugin-wide cadence the settings
+	// carry: every install's patrol trigger is held to it.
+	patrol setup.PatrolSpec
 }
 
 // desiredState reads the settings once. With no Settings source the answer is
@@ -504,6 +508,7 @@ func (e Engine) desiredState(ctx context.Context) (desiredState, error) {
 			OpenAIAuthMethod: settings.Default(role, settings.FieldLLMOpenAIAuthMethod),
 		}
 	}
+	d.patrol = setup.DefaultPatrolSpec()
 	d.mcpURL = settings.Default(settings.Roles[0], settings.FieldMCPUrl)
 	d.mcpTokenEnv = settings.Default(settings.Roles[0], settings.FieldMCPTokenFromEnv)
 
@@ -538,6 +543,14 @@ func (e Engine) desiredState(ctx context.Context) (desiredState, error) {
 			keys := d.llmKeys[role]
 			keys.OpenAIAuthMethod = s.Value
 			d.llmKeys[role] = keys
+		case settings.FieldPatrolEnabled:
+			d.patrol.Enabled = s.Value != settings.PatrolOff
+		case settings.FieldPatrolInterval:
+			// An interval the plugin does not offer (a row written by hand) leaves the
+			// shipped cadence in force: a pass never writes a schedule it cannot name.
+			if schedule, err := setup.PatrolSchedule(s.Value); err == nil {
+				d.patrol.Schedule = schedule
+			}
 		case settings.FieldMCPUrl:
 			if role == settings.Roles[0] {
 				d.mcpURL = s.Value
@@ -611,7 +624,7 @@ func (e Engine) reconcileInstall(ctx context.Context, in *setup.Install, want de
 	// developer's agent exists: a trigger with no agent to fire at is refused
 	// by the hub.
 	if scope.has(ScopeTrigger) && in.Roles[setup.RoleDeveloper].AgentID != "" {
-		e.reconcileCronTriggers(ctx, in, sum)
+		e.reconcileCronTriggers(ctx, in, want.patrol, sum)
 	}
 
 	if in.ConnectorID == "" {
@@ -1002,11 +1015,13 @@ func (e Engine) reconcileTriggers(ctx context.Context, in *setup.Install, sum *S
 	}
 }
 
-// reconcileCronTriggers ensures the install's scheduled prompts exist — the
-// developer's PR patrol. Discovery is by name, like the event triggers' by filter
-// set: a pass creates what is missing and reports no drift on one that is there,
-// whatever an admin has since retuned on it.
-func (e Engine) reconcileCronTriggers(ctx context.Context, in *setup.Install, sum *Summary) {
+// reconcileCronTriggers holds the install's scheduled prompts — the developer's PR
+// patrol — to the plugin-wide patrol setting. Discovery is by name: a missing trigger is
+// filed from the setting, and one that is there is retuned when its cadence or its
+// enablement differs from it. The patrol is one global setting, so a cadence retuned on
+// the hub's Schedules UI is put back; the prompt is not the setting's, and the update
+// sends the row's own back so an edit to it survives.
+func (e Engine) reconcileCronTriggers(ctx context.Context, in *setup.Install, patrol setup.PatrolSpec, sum *Summary) {
 	existing, err := e.Hub.ListCronTriggers(ctx)
 	if err != nil {
 		e.log(in.Slug, fmt.Sprintf("list cron triggers: %v", err))
@@ -1014,7 +1029,8 @@ func (e Engine) reconcileCronTriggers(ctx context.Context, in *setup.Install, su
 		return
 	}
 
-	for _, ct := range setup.CronMissing(setup.CronTriggers(*in), existing) {
+	wanted := setup.CronTriggers(*in, patrol)
+	for _, ct := range setup.CronMissing(wanted, existing) {
 		if _, err := e.Hub.CreateCronTrigger(ctx, in.GroupID, ct); err != nil {
 			e.log(in.Slug, fmt.Sprintf("refused cron trigger %s: %v", ct.Name, err))
 			sum.refused(Refusal{Install: in.Slug, Kind: "trigger", Field: ct.Name, Error: err.Error()})
@@ -1023,6 +1039,50 @@ func (e Engine) reconcileCronTriggers(ctx context.Context, in *setup.Install, su
 		e.log(in.Slug, fmt.Sprintf("created cron trigger %s", ct.Name))
 		sum.updated(Change{Install: in.Slug, Kind: "trigger", Field: ct.Name, To: "created"})
 	}
+
+	for _, w := range wanted {
+		for _, row := range existing {
+			if row.Name != w.Name {
+				continue
+			}
+			var update hub.CronTriggerUpdate
+			if row.Schedule != w.Schedule {
+				schedule := w.Schedule
+				update.Schedule = &schedule
+			}
+			if row.Enabled != w.Enabled {
+				enabled := w.Enabled
+				update.Enabled = &enabled
+			}
+			if update.Schedule == nil && update.Enabled == nil {
+				break
+			}
+			// The hub's update takes the name, the agent and the prompt on every write:
+			// the row's own are sent back. A list that answers without a prompt sends the
+			// shipped brief rather than an empty one, which the hub would store as a
+			// patrol with no brief.
+			update.Name, update.AgentRef, update.Prompt = row.Name, row.AgentRef, row.Prompt
+			if update.Prompt == "" {
+				update.Prompt = setup.CronPatrolPrompt
+			}
+			if err := e.Hub.UpdateCronTrigger(ctx, row.ID, update); err != nil {
+				e.log(in.Slug, fmt.Sprintf("refused cron trigger update %s: %v", row.Name, err))
+				sum.refused(Refusal{Install: in.Slug, Kind: "trigger", Field: row.Name, Error: err.Error()})
+				break
+			}
+			e.log(in.Slug, fmt.Sprintf("retuned cron trigger %s", row.Name))
+			sum.updated(Change{Install: in.Slug, Kind: "trigger", Field: row.Name, From: patrolText(row.Schedule, row.Enabled), To: patrolText(w.Schedule, w.Enabled)})
+			break
+		}
+	}
+}
+
+// patrolText reads a patrol state the way a pass's summary shows it.
+func patrolText(schedule string, enabled bool) string {
+	if !enabled {
+		return "off"
+	}
+	return schedule
 }
 
 // reconcileCoverage reads new events since the last pass and folds them into

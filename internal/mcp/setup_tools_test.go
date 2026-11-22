@@ -1045,6 +1045,263 @@ func TestMCPSetupRoleSchemaOffersTheWindow(t *testing.T) {
 	}
 }
 
+// -- the developer's PR patrol --------------------------------------------------------
+
+// TestMCPSetupPlanCarriesThePatrolCadenceTheCallerNamed: the roles argument takes the patrol the
+// console's form writes, and the plan answers with the wanted set and the create op that name the
+// same cadence — byte for byte what the route answers for the same body, because both read one
+// Input and one Plan.
+func TestMCPSetupPlanCarriesThePatrolCadenceTheCallerNamed(t *testing.T) {
+	f := newSetupFixture()
+	srv := httptest.NewServer(NewHandler("0.1.0", testService(t), f.service(t)))
+	t.Cleanup(srv.Close)
+
+	args := planArgs()
+	args["roles"].(map[string]any)["developer"] = map[string]any{
+		"runtime": "python:3.11",
+		"patrol":  map[string]any{"interval": "2h"},
+	}
+
+	code, httpBody := httpSetupCall(t, f.handler(t), http.MethodPost, "/api/setup/plan", args, adminCaller(t))
+	if code != http.StatusOK {
+		t.Fatalf("route: status = %d, want 200 (body %s)", code, httpBody)
+	}
+	got := callSetupOK(t, srv.URL, "setup_plan", args)
+	if got != httpBody {
+		t.Errorf("tool answer != route body\n tool: %s\n route: %s", got, httpBody)
+	}
+
+	var plan setup.Result
+	decodeTool(t, got, &plan)
+	if len(plan.Verdict.Blocking) != 0 {
+		t.Fatalf("blocking = %q, want a clear verdict", plan.Verdict.Blocking)
+	}
+	if len(plan.CronTriggers) != 1 || plan.CronTriggers[0].Schedule != "0 */2 * * *" {
+		t.Fatalf("cron triggers = %+v, want the patrol every 2 hours", plan.CronTriggers)
+	}
+	var named int
+	for _, op := range plan.Create {
+		if op.Kind == setup.KindCronTrigger {
+			named++
+			if !strings.Contains(op.Detail, "schedule 0 */2 * * *") {
+				t.Errorf("cron trigger op %q, want the cadence the caller named", op.Detail)
+			}
+		}
+	}
+	if named != 1 {
+		t.Errorf("%d cron trigger creates, want 1; create = %v", named, plan.Create)
+	}
+}
+
+// TestMCPSetupPlanPatrolIsWhatsWantedAndWhatsNot is the tool path's half of the two rules the
+// whole feature rests on, and the pair an MCP caller can get wrong: naming an interval moves the
+// patrol, and switching it off takes it out of the wanted set — while an argument that says nothing
+// about the patrol says nothing, even against a row that records one. That last case is what leaves
+// a cadence an admin retuned on the AInsel console alone through a tool call that came to change
+// something else.
+func TestMCPSetupPlanPatrolIsWhatsWantedAndWhatsNot(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// What the developer's card says about the patrol: nil is "said nothing".
+		patrol map[string]any
+		// What the plan is expected to answer.
+		wantSchedule string
+		wantOps      int
+	}{
+		{"a cadence the caller names is the cadence", map[string]any{"interval": "6h"}, "0 */6 * * *", 1},
+		{
+			// Switching it off is a write — the hub's row takes enabled:false — and it is what
+			// takes the patrol out of the wanted set the apply and the re-apply loop read from.
+			"one the caller switches off leaves the wanted set", map[string]any{"enabled": false}, "", 1,
+		},
+		// The row below records the wizard having written every 2 hours; a card that says nothing
+		// about the patrol leaves it exactly there.
+		{"a card that says nothing changes nothing", nil, "0 */2 * * *", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newSetupFixture()
+
+			// An install the wizard wrote, with the developer's patrol recorded as every 2 hours:
+			// the row is what the plan diffs against, and it is the only thing here that knows what
+			// the wizard last wrote.
+			const slug = "demo"
+			row := setup.Install{
+				Slug: slug, GroupID: "g-1", Org: "demo-org",
+				Roles: map[setup.Role]setup.RoleState{},
+			}
+			for _, r := range []setup.Role{setup.RoleRefiner, setup.RoleDeveloper, setup.RoleReviewer} {
+				row.Roles[r] = setup.RoleState{
+					AgentID:  "ag-" + string(r),
+					ImageID:  "img-" + string(r),
+					BotLogin: setup.BotLogin(r, slug),
+				}
+			}
+			rs := row.Roles[setup.RoleDeveloper]
+			rs.Patrol = &setup.Patrol{Enabled: true, Interval: "2h", Schedule: "0 */2 * * *"}
+			row.Roles[setup.RoleDeveloper] = rs
+			f.store.installs[slug] = row
+			f.hub.SeedAgents = map[string]hub.Agent{}
+			f.hub.SeedImages = map[string]hub.Image{}
+			for _, r := range []setup.Role{setup.RoleRefiner, setup.RoleDeveloper, setup.RoleReviewer} {
+				f.hub.SeedAgents["ag-"+string(r)] = hub.Agent{
+					ID:   "ag-" + string(r),
+					Name: setup.AgentName(r, slug),
+					LLM:  &hub.LLMSpec{Provider: "ollama-cloud", Model: "glm-4.7"},
+				}
+				f.hub.SeedImages["img-"+string(r)] = hub.Image{ID: "img-" + string(r), ImageURL: "python:3.11"}
+			}
+
+			srv := httptest.NewServer(NewHandler("0.1.0", testService(t), f.service(t)))
+			t.Cleanup(srv.Close)
+
+			args := planArgs()
+			developer := map[string]any{"runtime": "python:3.11"}
+			if tc.patrol != nil {
+				developer["patrol"] = tc.patrol
+			}
+			args["roles"].(map[string]any)["developer"] = developer
+
+			var plan setup.Result
+			decodeTool(t, callSetupOK(t, srv.URL, "setup_plan", args), &plan)
+			if len(plan.Verdict.Blocking) != 0 {
+				t.Fatalf("blocking = %q, want a clear verdict", plan.Verdict.Blocking)
+			}
+			if tc.wantSchedule == "" {
+				if len(plan.CronTriggers) != 0 {
+					t.Errorf("cron triggers = %+v, want none", plan.CronTriggers)
+				}
+			} else if len(plan.CronTriggers) != 1 || plan.CronTriggers[0].Schedule != tc.wantSchedule {
+				t.Errorf("cron triggers = %+v, want the patrol at %q", plan.CronTriggers, tc.wantSchedule)
+			}
+
+			var ops int
+			for _, op := range plan.Change {
+				if op.Kind != setup.KindCronTrigger {
+					continue
+				}
+				ops++
+				// The preview says the change in the words the admin would use: the state it
+				// was in and the state it is going to, not a field name and a value.
+				if !strings.Contains(op.Detail, "patrol: ") {
+					t.Errorf("patrol op %q, want it to name the patrol and both readings", op.Detail)
+				}
+			}
+			if ops != tc.wantOps {
+				t.Errorf("%d patrol changes, want %d; change = %v", ops, tc.wantOps, plan.Change)
+			}
+		})
+	}
+}
+
+// TestMCPSetupPlanRefusesAPatrolThatIsNotShapedRight: a patrol has to be the object the schema
+// describes, and the refusal names the argument so a caller that sent a string or a number where a
+// boolean belongs knows what to fix. A cadence that is a string but is not one the plugin offers is
+// not the argument's problem: the plan blocks on it, the way it blocks on the console's form.
+func TestMCPSetupPlanRefusesAPatrolThatIsNotShapedRight(t *testing.T) {
+	srv := httptest.NewServer(NewHandler("0.1.0", testService(t), testSetupService(t)))
+	t.Cleanup(srv.Close)
+
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{"a string", "30m", "patrol must be an object"},
+		{"a list", []any{"30m"}, "patrol must be an object"},
+		{"an enablement that is not a boolean", map[string]any{"enabled": "no"}, "patrol.enabled must be true or false"},
+		{"an interval that is not a string", map[string]any{"interval": 30}, "patrol.interval must be a string"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := planArgs()
+			args["roles"].(map[string]any)["developer"] = map[string]any{
+				"runtime": "python:3.11",
+				"patrol":  tc.value,
+			}
+			got := callTool(t, srv.URL, adminCaller(t), "setup_plan", args)
+			if !got.IsError || !strings.Contains(got.Text, tc.want) {
+				t.Fatalf("setup_plan with a bad patrol: (isError %v, text %q), want a refusal saying %q",
+					got.IsError, got.Text, tc.want)
+			}
+		})
+	}
+}
+
+// TestMCPSetupPlanBlocksACadenceThePluginDoesNotOffer is the plan's guard on the tool path, and the
+// only thing standing between a caller and a cadence that looks normal and is not: `*/45 * * * *`
+// fires at :00 and :45 and resets, which is not a 45-minute patrol. It is refused in the plan, with
+// the list of what is offered in the sentence, rather than written to the hub as a surprise.
+func TestMCPSetupPlanBlocksACadenceThePluginDoesNotOffer(t *testing.T) {
+	srv := httptest.NewServer(NewHandler("0.1.0", testService(t), testSetupService(t)))
+	t.Cleanup(srv.Close)
+
+	args := planArgs()
+	args["roles"].(map[string]any)["developer"] = map[string]any{
+		"runtime": "python:3.11",
+		"patrol":  map[string]any{"interval": "45m"},
+	}
+	got := callSetupOK(t, srv.URL, "setup_plan", args)
+
+	var plan setup.Result
+	decodeTool(t, got, &plan)
+	var found string
+	for _, b := range plan.Verdict.Blocking {
+		if strings.Contains(b, "patrol") {
+			found = b
+		}
+	}
+	if found == "" {
+		t.Fatalf("blocking = %q, want the plan to refuse the cadence", plan.Verdict.Blocking)
+	}
+	if !strings.Contains(found, "45m") || !strings.Contains(found, "developer") {
+		t.Errorf("block %q, want it to name the cadence and the role", found)
+	}
+}
+
+// TestMCPSetupRoleSchemaOffersThePatrol: the patrol is on the tool's schema, because a caller that
+// cannot see it cannot set it — and the description is where the difference between omitting it and
+// naming only a cadence is stated, since those are two different answers.
+func TestMCPSetupRoleSchemaOffersThePatrol(t *testing.T) {
+	srv := httptest.NewServer(NewHandler("0.1.0", testService(t), testSetupService(t)))
+	t.Cleanup(srv.Close)
+
+	var listed struct {
+		Tools []struct {
+			Name        string         `json:"name"`
+			InputSchema map[string]any `json:"inputSchema"`
+		} `json:"tools"`
+	}
+	callResult(t, srv.URL, 3, "tools/list", map[string]any{}, &listed)
+
+	for _, tool := range listed.Tools {
+		if tool.Name != "setup_plan" && tool.Name != "setup_apply" {
+			continue
+		}
+		props, _ := tool.InputSchema["properties"].(map[string]any)
+		roles, _ := props["roles"].(map[string]any)
+		rolesProps, _ := roles["properties"].(map[string]any)
+		developer, _ := rolesProps["developer"].(map[string]any)
+		developerProps, _ := developer["properties"].(map[string]any)
+		patrol, ok := developerProps["patrol"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s: the role schema has no patrol; role fields = %v", tool.Name, keysOf(developerProps))
+		}
+		patrolProps, _ := patrol["properties"].(map[string]any)
+		for _, field := range []string{"enabled", "interval", "schedule"} {
+			if _, ok := patrolProps[field]; !ok {
+				t.Errorf("%s: patrol has no %s", tool.Name, field)
+			}
+		}
+		if desc, _ := patrol["description"].(string); !strings.Contains(desc, "Omit it to say nothing") {
+			t.Errorf("%s: patrol description = %q, want it to state what omitting means", tool.Name, desc)
+		}
+		// The list is in the schema and nowhere else a caller can read it before choosing.
+		interval, _ := patrolProps["interval"].(map[string]any)
+		if desc, _ := interval["description"].(string); !strings.Contains(desc, "30m") || !strings.Contains(desc, "12h") {
+			t.Errorf("%s: interval description = %q, want it to name what is offered", tool.Name, desc)
+		}
+	}
+}
+
 // keysOf names a schema object's fields, sorted, so a failure to find one says what is there.
 func keysOf(m map[string]any) []string {
 	out := make([]string, 0, len(m))

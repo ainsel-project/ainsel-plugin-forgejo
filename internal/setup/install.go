@@ -97,6 +97,16 @@ type RoleState struct {
 	// untouched form writes nothing.
 	WorkingHours *WorkingHours `json:"workingHours,omitempty"`
 
+	// Patrol is the developer's scheduled PR patrol as the wizard last wrote it:
+	// whether it runs, and at what cadence. Nil is "the wizard never wrote one", which
+	// reads as on at the shipped cadence — the same answer a row written before this
+	// option gives, so the two are indistinguishable and both keep working. Like
+	// WorkingHours it is the record of what the wizard wrote and not a reading of the
+	// hub: the plan diffs the form against this, which is what lets a cadence an admin
+	// retuned on the hub's Schedules UI survive a re-apply made for another reason.
+	// Only the developer role's copy is ever read.
+	Patrol *Patrol `json:"patrol,omitempty"`
+
 	// LLMOpenAIAuthMethod records the auth method the openai agent was last
 	// written with — "APIKey" or "ChatGPTSignIn". It is the method half of "what
 	// does this role authenticate with", which the key fingerprint cannot say: a

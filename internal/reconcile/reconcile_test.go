@@ -2428,6 +2428,70 @@ func TestPassSkipsPatrolWithoutDeveloperAgent(t *testing.T) {
 	}
 }
 
+// TestPassFilesNothingForAPatrolTheInstallSwitchedOff is the pass's half of the rule the
+// wizard's answer has to hold: the wanted set is generated from the install row, so a row
+// that says off asks for nothing, and the pass that would otherwise re-file the shipped
+// patrol files nothing.
+//
+// The second case is the one that would be the bug. An admin who switched the patrol off in
+// the wizard and back on in the console has changed the console's mind, not the wizard's, and
+// the pass has no reading of the console's intent to correct it with — so it writes nothing
+// at all. The pass only ever creates what the row asks for; it never re-enables.
+func TestPassFilesNothingForAPatrolTheInstallSwitchedOff(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		seeds []setup.CronTrigger
+	}{
+		{"with no row on the hub at all", nil},
+		{
+			"with one the console switched back on",
+			[]setup.CronTrigger{{
+				ID: "c-1", Name: "forgejo-developer-pr-patrol-app",
+				AgentRef: "a-developer", Schedule: "*/5 * * * *", Prompt: "Retuned.", Enabled: true,
+			}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			st, cleanup := tmpStore(t)
+			defer cleanup()
+
+			install := setup.Install{
+				Slug:          "app",
+				LayoutVersion: setup.LayoutManagedAgents,
+				GroupID:       "g-1",
+				ConnectorID:   "c-app",
+				Roles: map[setup.Role]setup.RoleState{
+					setup.RoleDeveloper: {
+						AgentID: "a-developer",
+						Patrol:  &setup.Patrol{Enabled: false, Schedule: "*/30 * * * *"},
+					},
+				},
+			}
+			if err := st.Save(ctx, install); err != nil {
+				t.Fatalf("Save: %v", err)
+			}
+
+			f := &hub.Fake{
+				PluginGroupsSeed: []string{"g-1"},
+				Triggers:         map[string][]setup.Trigger{},
+				CronTriggers:     tc.seeds,
+			}
+			engine := Engine{Hub: f, Store: st, Log: func(slug, msg string) {}}
+
+			if _, err := engine.Pass(ctx, ScopeAll); err != nil {
+				t.Fatalf("Pass: %v", err)
+			}
+			if len(f.CreatedCronTriggers) != 0 {
+				t.Errorf("created cron triggers = %d, want 0 — the row says the patrol is off", len(f.CreatedCronTriggers))
+			}
+			if len(f.UpdatedCronTriggers) != 0 {
+				t.Errorf("updated cron triggers = %d, want 0 — the pass does not re-enable or retune", len(f.UpdatedCronTriggers))
+			}
+		})
+	}
+}
+
 // TestPassCorrectsADriftedCustomURL is the custom endpoint's drift rule: while
 // the role runs on the custom provider, the agent's URL is readable from the
 // hub, so a hub that drifted off the settings' URL is set back — and the

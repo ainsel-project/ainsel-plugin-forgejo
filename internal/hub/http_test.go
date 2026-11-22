@@ -2810,6 +2810,59 @@ func TestDeleteCronTriggerDeletesByID(t *testing.T) {
 	}
 }
 
+// TestUpdateCronTriggerSendsOnlyWhatMoved is the wire the patrol's cadence and enablement
+// ride on. Three fields are always sent, because the hub's update takes them: the name, the
+// agent and the prompt — which is also how a prompt an admin edited on the Schedules UI
+// survives a write that came to change the cadence. The two the install may mean to move are
+// absent when it means to leave them, and the case that matters is enabled:false: a false
+// written as an empty value would be dropped by the encoder and leave a patrol the admin
+// switched off running.
+func TestUpdateCronTriggerSendsOnlyWhatMoved(t *testing.T) {
+	h := newHubServer(t)
+	h.reply(http.MethodPut, "/api/v1/cron-triggers/c-9", http.StatusOK, `{"id":"c-9"}`)
+
+	c := h.client()
+	schedule := "0 */2 * * *"
+
+	// The cadence moved, the enablement did not.
+	if err := c.UpdateCronTrigger(WithBackground(context.Background()), "c-9", CronTriggerUpdate{
+		Name: "forgejo-developer-pr-patrol-apps", AgentRef: "a-developer",
+		Prompt: "The hub's own prompt.", Schedule: &schedule,
+	}); err != nil {
+		t.Fatalf("UpdateCronTrigger: %v", err)
+	}
+	var moved map[string]any
+	if err := json.Unmarshal([]byte(h.calls(http.MethodPut, "/api/v1/cron-triggers/c-9")[0].Body), &moved); err != nil {
+		t.Fatalf("body is not JSON: %s", h.calls(http.MethodPut, "/api/v1/cron-triggers/c-9")[0].Body)
+	}
+	if moved["name"] != "forgejo-developer-pr-patrol-apps" || moved["agentRef"] != "a-developer" ||
+		moved["prompt"] != "The hub's own prompt." || moved["schedule"] != "0 */2 * * *" {
+		t.Errorf("body = %v, want the three required fields and the new schedule", moved)
+	}
+	if _, ok := moved["enabled"]; ok {
+		t.Errorf("body carries enabled = %v, want it absent: an apply that retuned the cadence did not ask to switch the patrol", moved["enabled"])
+	}
+
+	// The enablement moved, the cadence did not.
+	if err := c.UpdateCronTrigger(WithBackground(context.Background()), "c-9", CronTriggerUpdate{
+		Name: "forgejo-developer-pr-patrol-apps", AgentRef: "a-developer",
+		Prompt: "The hub's own prompt.", Enabled: new(false),
+	}); err != nil {
+		t.Fatalf("UpdateCronTrigger: %v", err)
+	}
+	var off map[string]any
+	if err := json.Unmarshal([]byte(h.calls(http.MethodPut, "/api/v1/cron-triggers/c-9")[1].Body), &off); err != nil {
+		t.Fatalf("body is not JSON: %s", h.calls(http.MethodPut, "/api/v1/cron-triggers/c-9")[1].Body)
+	}
+	v, ok := off["enabled"]
+	if !ok || v != false {
+		t.Errorf("body enabled = %v (present: %v), want an explicit false", v, ok)
+	}
+	if _, ok := off["schedule"]; ok {
+		t.Errorf("body carries schedule = %v, want it absent: switching the patrol off is not retuning it", off["schedule"])
+	}
+}
+
 // TestCreateAgentSendsTheAuthMethod is the sign-in's create wire: the openAI block
 // names authMethod and no apiKey, because the hub refuses a block that carries both.
 // A spec that names neither leaves the block absent, as it was.

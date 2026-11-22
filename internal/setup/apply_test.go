@@ -61,6 +61,16 @@ type fakeHub struct {
 	// cronTriggerCreates records the group, name and schedule of each
 	// CreateCronTrigger call in call order.
 	cronTriggerCreates []cronTriggerCreate
+	// cronTriggers seeds what ListCronTriggers answers with on an edit: the patrol row
+	// the install already has on the hub, id and all — including the enabled flag, which
+	// is what a test of "did the apply switch it off" reads back.
+	cronTriggers []CronTrigger
+	// cronTriggerUpdates records each UpdateCronTrigger call in call order: the row it
+	// addressed and the halves it moved.
+	cronTriggerUpdates []cronTriggerUpdate
+	// cronTriggerUpdateErr fails UpdateCronTrigger: the hub refusing the patrol write
+	// is what an edit must carry out as an error rather than a half-written install.
+	cronTriggerUpdateErr error
 
 	// AgentCreateArgsSlice records the parameters passed to each CreateAgent call for assertions
 	AgentCreateArgsSlice []agentCreateCall
@@ -120,6 +130,18 @@ type cronTriggerCreate struct {
 	groupID  string
 	name     string
 	schedule string
+}
+
+// cronTriggerUpdate is one UpdateCronTrigger call as the fake saw it. The two moved
+// halves are pointers for the reason the real write has them: a nil is "the apply said
+// nothing about this half", which is not the same answer as a false or a keep.
+type cronTriggerUpdate struct {
+	id       string
+	name     string
+	agentRef string
+	prompt   string
+	schedule *string
+	enabled  *bool
 }
 
 // nextID hands out deterministic, collision-free ids for created resources.
@@ -238,6 +260,39 @@ func (f *fakeHub) CreateCronTrigger(ctx context.Context, groupID string, trigger
 		return "", f.cronTriggerCreateError
 	}
 	return f.nextID("cron"), nil
+}
+
+func (f *fakeHub) ListCronTriggers(ctx context.Context) ([]CronTrigger, error) {
+	f.calls = append(f.calls, "ListCronTriggers")
+	return append([]CronTrigger(nil), f.cronTriggers...), nil
+}
+
+func (f *fakeHub) UpdateCronTrigger(ctx context.Context, cronTriggerID string, update CronTriggerUpdate) error {
+	f.calls = append(f.calls, "UpdateCronTrigger")
+	f.cronTriggerUpdates = append(f.cronTriggerUpdates, cronTriggerUpdate{
+		id:       cronTriggerID,
+		name:     update.Name,
+		agentRef: update.AgentRef,
+		prompt:   update.Prompt,
+		schedule: update.Schedule,
+		enabled:  update.Enabled,
+	})
+	if f.cronTriggerUpdateErr != nil {
+		return f.cronTriggerUpdateErr
+	}
+	// The write persists, so a test can read the row back the way a second apply would.
+	for i, ct := range f.cronTriggers {
+		if ct.ID != cronTriggerID {
+			continue
+		}
+		if update.Schedule != nil {
+			f.cronTriggers[i].Schedule = *update.Schedule
+		}
+		if update.Enabled != nil {
+			f.cronTriggers[i].Enabled = *update.Enabled
+		}
+	}
+	return nil
 }
 
 func (f *fakeHub) DeleteCronTrigger(ctx context.Context, cronTriggerID string) error {

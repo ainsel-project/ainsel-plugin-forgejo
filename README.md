@@ -2,7 +2,7 @@
 
 Shows what AInsel agents did and are doing on Forgejo — repo → issue → PR → runs, with time, cost and links straight to Forgejo.
 
-An **install** of this plugin is a complete, fresh trio for one Forgejo organisation: a refiner, a developer and a reviewer, each with its own Forgejo bot account, its own AInsel role image, its own tool grant on its own agent, its own predefined persona and its own model. The install also owns its own connector, forge MCP server and seven triggers: six event triggers and the developer's half-hourly pull-request patrol. The setup wizard creates all of it; nothing is adopted, and nothing that already exists is edited.
+An **install** of this plugin is a complete, fresh trio for one Forgejo organisation: a refiner, a developer and a reviewer, each with its own Forgejo bot account, its own AInsel role image, its own tool grant on its own agent, its own predefined persona and its own model. The install also owns its own connector, forge MCP server and seven triggers: six event triggers and the developer's pull-request patrol, on a cadence the wizard sets (every 30 minutes by default). The setup wizard creates all of it; nothing is adopted, and nothing that already exists is edited.
 
 Documentation lives in [`docs/`](docs/) and is published at **[ainsel-project.github.io/ainsel-plugin-forgejo](https://ainsel-project.github.io/ainsel-plugin-forgejo/)** — start at [Overview](docs/overview.md) for what the plugin is, or [Quick Start](docs/quickstart.md) to install it.
 
@@ -45,9 +45,9 @@ Full walkthrough, screen by screen: [`docs/setup.md`](docs/setup.md).
 | `forgejo-<role>-<slug>` (default) | the agent, on that image and persona, with the role's provider and model. Its display name is the one name you may change. |
 | `forgejo-<slug>` | the connector that receives the webhook (`signatureHeader: X-Forgejo-Signature`). Each install creates its own, so no two ever share one. |
 | `forgejo-<role>-<what>-<slug>` | the six event triggers: refiner × issue opened, issue reopened and mention; reviewer × pull request opened and mention; developer × mention. |
-| `forgejo-developer-pr-patrol-<slug>` | the seventh: a cron trigger that wakes the developer every 30 minutes to check its open pull requests — at most two repositories per run — for unaddressed review comments, failing CI and merge conflicts — and to post nothing when nothing changed. |
+| `forgejo-developer-pr-patrol-<slug>` | the seventh: a cron trigger that wakes the developer to check its open pull requests — at most two repositories per run — for unaddressed review comments, failing CI and merge conflicts, and to post nothing when nothing changed. Its cadence is the wizard's to set, from every minute to every twelve hours or an expression of your own, and it can be switched off; the shipped answer is every 30 minutes. |
 
-Plus, in the plugin's own database, one install row: the ids of everything above, the bot logins, the exclude label, the three tool sets, when the webhook was last verified and which event families have arrived. It holds no secret.
+Plus, in the plugin's own database, one install row: the ids of everything above, the bot logins, the exclude label, the three tool sets, the patrol's cadence, when the webhook was last verified and which event families have arrived. It holds no secret.
 
 ## Credentials and access
 
@@ -107,7 +107,7 @@ The plugin serves the composed document at `/skills/forgejo/SKILL.md`, which is 
 
 ## Keeping an install in shape
 
-The plugin re-applies every install's managed state once at start and again whenever the plugin's settings are saved — the pass is triggered, not scheduled, and there is no periodic timer — as its background identity: the tool grant on each agent, each agent's image and persona, the six event triggers, the patrol cron trigger, and the event coverage. Drift is set back and each correction is logged against the install. An install whose group the plugin can no longer act for is skipped, and the loop only ever touches the resource ids recorded on that install's own row.
+The plugin re-applies every install's managed state once at start and again whenever the plugin's settings are saved — the pass is triggered, not scheduled, and there is no periodic timer — as its background identity: the tool grant on each agent, each agent's image and persona, the six event triggers, the patrol cron trigger — unless the install switched that patrol off, which the loop respects rather than correcting — and the event coverage. Drift is set back and each correction is logged against the install. An install whose group the plugin can no longer act for is skipped, and the loop only ever touches the resource ids recorded on that install's own row.
 
 Every AInsel resource the wizard creates is stamped `managedBy: plugin-forgejo` at create: they are **read-only in the AInsel console** — the hub refuses console writes of them with 409 — and the wizard, which writes as the plugin's own identity, is the only way to change them. Two gaps the hub leaves today: triggers carry no stamp, so they stay console-editable, and the stamp cannot be set on an existing resource, so installs created before this stamping shipped stay console-managed until they are removed and re-created. Drift is what the re-apply loop above is for.
 

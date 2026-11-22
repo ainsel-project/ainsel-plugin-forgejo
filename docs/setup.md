@@ -176,6 +176,7 @@ Three tabs, one per role. For each:
 | Agent name | the agent's display name, default `forgejo-<role>-<slug>`. The only name you may change. |
 | Tools | a scrollable checklist, with the shipped defaults for the role as the baseline. Editable within the guard rails below. Per role, **Check all** ticks every offered tool the rails allow (it never adds a forbidden one) and **Uncheck all** clears the whole selection, a forbidden-but-checked tool included. |
 | Working hours | optional, and per role — there is no *same for all roles* tick here, because three agents moving together is three decisions. Tick it and the role's agent works a window: which days, from when to when, in which zone. Unticked, the agent works any hour, which is what an install without a window means. |
+| Patrol | the developer's only, and optional — how often the install wakes the developer to check its open pull requests, and whether it wakes at all. A tick for whether it runs, chips for the cadence (`1m` to `12h`), and a cron box for a cadence no chip offers. Untouched, the wizard says nothing about the patrol, which is what leaves a patrol you moved on the AInsel console where you moved it. |
 | Turn timeout | minutes one turn of this role's agent may run, written to the role image as `TURN_TIMEOUT_MS`. Prefilled with the shipped default (120 for the developer, 60 for the refiner and reviewer); any whole number of milliseconds from 1 minute to 1 day is accepted. On an edit the field starts at the value the install was last written with, and **empty means keep** — a re-apply never resets the image's timeout, so a value set by hand on the image survives. Setting it, though, restates the image's whole env list as `FORGEJO_TOKEN` plus `TURN_TIMEOUT_MS`, dropping any other entry the image carried (the `TURN_TIMEOUT_MS` paragraph under [S3](#s3--forgejo-accounts) spells that out). The plan shows the effective value per role before anything is written. |
 
 | Provider key | optional, and per role — the one secret this step asks for, because it is the only place a key can be given before the role's agent exists. It is used only while the role's provider holds one (`custom`, `openai`, `anthropic`, `google`); for any other provider the plan drops it, and an empty field is not a write of any kind. What you type goes to the hub as the agent's secret and is kept nowhere here. |
@@ -234,12 +235,48 @@ ticking it off, clears it — the apply says *clear* and the agent goes back to 
 hour. Leaving the box unticked on an install whose window the wizard wrote is not a
 clear: it is silence about hours, and the stored window stands.
 
+**The patrol is the developer's, and it is a cadence, not a cron field.** Every
+install ships with one cron trigger, `forgejo-developer-pr-patrol-<slug>`, which
+wakes the developer to look at its open pull requests. It used to be one fixed
+cadence for every install on the machine — `*/30 * * * *` — with no way to slow it,
+speed it up, or stop it. It is now a field on the install row, the same kind of
+value a working window is: the record of what the wizard last wrote, and the thing
+the plan diffs the form against.
+
+Pick a cadence from the chips, or type an expression when no chip means what you
+want. The chips are the cadences whose cron step divides its unit, and that is not
+a matter of taste: cron counts a step from zero and resets at the top of the unit,
+so `*/45 * * * *` fires at `:00` and `:45` and starts over — a 45/15 loop wearing a
+normal-looking expression. The expression box is the way out, and it wins over a
+chip: a cadence has one spelling in force. The plugin checks an expression is shaped
+like cron (five fields) and leaves the grammar to the hub, which owns it.
+
+Switching it off **disables** the trigger; it does not delete it. The hub row stays
+with its prompt, its history and its console edits, and the tick brings it back.
+A deleted patrol has nothing to switch back on, and re-filing one would quietly
+throw away whatever the console holds in its place.
+
+And, like the window, the row is the whole rule: the plan diffs the form against
+what the install row records and never against the live trigger, so **a cadence or a
+prompt you retuned on the AInsel console's Schedules UI is never read into the row
+and never written back by an apply**. An install whose row never named a patrol —
+every install written before this — plans exactly as it did before. The form shows
+what such an install effectively runs (the tick ticked, the shipped cadence ticked)
+without claiming an answer: touching nothing sends nothing.
+
+Moving one half of the answer does not move the other. Picking a cadence on an
+install whose row switched the patrol off retunes it without switching it on;
+moving the tick leaves the cadence where it was. Every fire of the patrol is a model
+call against the install's model, so the chips under 10 minutes come with the bill
+in them — both in the step and in the plan's warnings.
+
 Blocking here: a role with no runtime container; a runtime with no tag and no digest
 (the step refuses it before the preview and names the roles that need the fix); a
 runtime with whitespace inside it (around one is trimmed, not blocked); two
 roles ending up with the same agent name; a window whose zone is not a zone AInsel
 knows, whose times are not `HH:MM`, or whose days are not weekdays; a turn timeout
-outside 1 minute to 1 day or not a whole number of milliseconds.
+outside 1 minute to 1 day or not a whole number of milliseconds; a patrol cadence the
+chips do not offer, or a patrol expression that is not five fields.
 
 ## S5 — Rules
 
@@ -259,7 +296,10 @@ a create names the agent's hours on the line it prints (`; working hours Mon–F
 09:00–17:00 Europe/Berlin`), and an edit says
 `working hours: "Mon–Fri 09:00–17:00 Europe/Berlin" -> "Mon–Thu 10:00–16:00 UTC"`,
 or `working hours: "Mon–Fri 09:00–17:00 Europe/Berlin" -> "any hours"` when the box was
-ticked off. An edit that says nothing about hours writes nothing about hours.
+ticked off. An edit that says nothing about hours writes nothing about hours. The
+patrol reads the same way: `patrol: "on, every 30m" -> "off, every 30m"`, or
+`patrol: "on, every 30m" -> "on, cron 15 9 * * 1-5"`, on the trigger the list names
+`forgejo-developer-pr-patrol-<slug>`.
 
 Alongside it, the verdict:
 
@@ -333,7 +373,8 @@ What each takes:
   `adminToken`, optionally `excludeLabel` and a `roles` object keyed `refiner`,
   `developer`, `reviewer`. Each role takes `runtime`, `agentName`, `tools` and
   `workingHours` — `{timezone, days, start, end}`, with the days as Go weekday
-  numbers (`0` is Sunday, and `7` reads as Sunday too). Omit a role for the shipped
+  numbers (`0` is Sunday, and `7` reads as Sunday too) — and the developer takes
+  `patrol`, `{enabled, interval, schedule}`. Omit a role for the shipped
   defaults, and an unknown role is refused rather than quietly defaulted. `baseUrl`
   has to name one of the instances `setup_options` listed — an address nobody
   configured is refused, naming it. A blank `baseUrl` keeps an existing install's
@@ -350,6 +391,19 @@ What each takes:
   replaces the window. A window that is not an object — a string, a list — is refused as
   a bad argument; a window that is an object but nonsense, a zone that does not exist, is
   blocked by the plan rather than failing on the apply.
+- `patrol` is the developer's scheduled PR patrol, and it has three answers where the
+  window has two. **Omitting** it says nothing: the install keeps the cadence and the
+  enablement its row records. `{interval: "2h"}` retunes the cadence and leaves the
+  patrol as enabled or disabled as it already was — `enabled` is a real option only when
+  you mean to move it, which is why an argument cannot switch a patrol off by accident.
+  `{enabled: false}` switches it off, which disables the hub's trigger rather than
+  deleting it: its prompt, its history and its console edits survive, and
+  `{enabled: true}` brings it back. `interval` is one of the offered cadences (`1m`, `2m`,
+  `3m`, `4m`, `5m`, `6m`, `10m`, `12m`, `15m`, `20m`, `30m`, `1h`, `2h`, `3h`, `4h`, `6h`,
+  `8h`, `12h`) and must divide its unit — `45m` is not an interval; `schedule` is a cron
+  expression for a cadence no interval means, and it wins over `interval`. Naming a
+  patrol on the refiner or the reviewer is ignored, not refused: it is the developer's
+  trigger, and the wizard sends one shape of role card for all three.
 - **`setup_apply`** — the same request. It creates for real and rolls back on
   failure, exactly as the apply route does.
 - **`setup_orphans_plan`** / **`setup_orphans_remove`** — `slug`, `baseUrl`,

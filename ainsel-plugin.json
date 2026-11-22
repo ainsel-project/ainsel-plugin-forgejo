@@ -1,7 +1,7 @@
 {
   "id": "forgejo",
   "displayName": "Forgejo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "pluginApi": "1.1",
   "description": "What AInsel agents do on Forgejo, and a quick setup for them.",
   "ui": {

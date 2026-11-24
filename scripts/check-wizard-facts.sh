@@ -14,12 +14,12 @@
 #   FORGEJO_TOKEN  a site-admin token
 # Optional:
 #   FORGE_MCP      name of an existing forge MCP server (default forgejo-mcp-server)
-#   RUNTIME        runtime container (default dpinsel/ainsel-pi:dev)
+#   RUNTIME        runtime container (default acme/ainsel-pi:dev)
 #   GROUP_ID       hub group for the throwaway image (required if authz is on)
 set -uo pipefail
 : "${AINSEL_HUB:?}" "${AINSEL_TOKEN:?}" "${FORGEJO_URL:?}" "${FORGEJO_TOKEN:?}"
 FORGE_MCP=${FORGE_MCP:-forgejo-mcp-server}
-RUNTIME=${RUNTIME:-dpinsel/ainsel-pi:dev}
+RUNTIME=${RUNTIME:-acme/ainsel-pi:dev}
 GROUP_ID=${GROUP_ID:-}
 TAG=zz-ainsel-check-$(date +%s)
 HUB="$AINSEL_HUB/api/v1"; FJ="$FORGEJO_URL/api/v1"

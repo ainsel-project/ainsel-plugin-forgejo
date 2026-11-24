@@ -20,8 +20,8 @@ import (
 // the helpers that produce them, so a change to the URL shape fails here.
 const (
 	testBase    = "https://git.example.test"
-	appsRepo    = "dpinsel/apps"
-	otherRepo   = "dpinsel/other"
+	appsRepo    = "acme/apps"
+	otherRepo   = "acme/other"
 	otherForge  = "someone/else"
 	connectorID = "c-1"
 )

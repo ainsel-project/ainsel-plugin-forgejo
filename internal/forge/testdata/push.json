@@ -26,5 +26,5 @@
     "id": "7d3e18b6c42f9c1a4d3b7e5c08a1d6f4b2e9c7a0",
     "message": "chore: bump the deck fixture\n"
   },
-  "pusher": { "name": "dpinsel", "email": "dpinsel@example.com" }
+  "pusher": { "name": "acme-dev", "email": "acme-dev@example.com" }
 }

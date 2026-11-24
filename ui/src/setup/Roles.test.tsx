@@ -224,7 +224,7 @@ describe("Roles (S4)", () => {
   it("refuses a runtime with no tag or digest, and says what to add", () => {
     const input = blankInput({
       refiner: "registry.example.com/base:latest",
-      developer: "dpinsel/ainsel-pi-maui",
+      developer: "acme/ainsel-pi-maui",
       reviewer: "registry.example.com/codex:latest",
     });
     const onNext = vi.fn();
@@ -249,8 +249,8 @@ describe("Roles (S4)", () => {
   it("names every untagged runtime together, in the order the cards list them", () => {
     const input = blankInput({
       refiner: "registry.example.com/base:latest",
-      developer: "dpinsel/ainsel-pi-maui",
-      reviewer: "dpinsel/ainsel-pi-maui",
+      developer: "acme/ainsel-pi-maui",
+      reviewer: "acme/ainsel-pi-maui",
     });
     const { container } = renderRoles({ input });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -263,9 +263,9 @@ describe("Roles (S4)", () => {
 
   it("lets a runtime that names a version through", () => {
     for (const ref of [
-      "dpinsel/ainsel-pi-maui:8.0",
-      `dpinsel/ainsel-pi-maui${DIGEST}`,
-      `dpinsel/ainsel-pi-maui:8.0${DIGEST}`,
+      "acme/ainsel-pi-maui:8.0",
+      `acme/ainsel-pi-maui${DIGEST}`,
+      `acme/ainsel-pi-maui:8.0${DIGEST}`,
       "registry:5000/img:8.0",
     ]) {
       cleanup();
@@ -290,7 +290,7 @@ describe("Roles (S4)", () => {
   it("flags all three cards when the shared runtime floats", () => {
     // The tick copies one value into three roles, so one bad ref is three bad refs —
     // and the refusal names all three, not just the one that was typed.
-    const shared = "dpinsel/ainsel-pi-maui";
+    const shared = "acme/ainsel-pi-maui";
     const input = blankInput({ refiner: shared, developer: shared, reviewer: shared });
     const onNext = vi.fn();
     const { container } = renderRoles({ input, onNext });

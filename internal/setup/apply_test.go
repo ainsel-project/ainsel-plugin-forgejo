@@ -672,7 +672,7 @@ func TestApplyRoleImagesCarryTurnTimeout(t *testing.T) {
 // FailedCreate — "must not have leading or trailing whitespace" — while the Job that
 // never got a pod held the agent's only task slot.
 func TestApplyWritesTheTrimmedRuntime(t *testing.T) {
-	const clean = "dpinsel/ainsel-pi-go:1.24"
+	const clean = "acme/ainsel-pi-go:1.24"
 	h := &fakeHub{
 		createdIDs: make(map[string]string),
 		imageTools: []ImageTool{{Name: "tool1", Kind: "forgejo", Enabled: false}},

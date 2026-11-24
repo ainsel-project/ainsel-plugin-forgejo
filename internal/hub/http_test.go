@@ -323,7 +323,7 @@ func TestRunsJoinsInvocationsEventsAndCost(t *testing.T) {
 		],"total":5,"page":1,"pageSize":200,"totalPages":1}`
 
 		eventE1 = `{"id":"e-1","timestamp":"2026-10-22T10:00:00Z","connector":"c-1","status":"matched",
-			"payload":{"repository":{"full_name":"dpinsel/apps"},
+			"payload":{"repository":{"full_name":"acme/apps"},
 				"issue":{"number":7,"title":"Add export","body":"please"}}}`
 
 		// e-2 is past retention: the hub has the invocation and no longer has the event.
@@ -365,8 +365,8 @@ func TestRunsJoinsInvocationsEventsAndCost(t *testing.T) {
 	if first.End == nil || !first.End.Equal(time.Date(2026, 10, 22, 10, 2, 0, 0, time.UTC)) {
 		t.Errorf("run 0 end = %v, want 10:02", first.End)
 	}
-	if first.Subject.Repo != "dpinsel/apps" || first.Subject.Number != 7 || first.Subject.Kind != forge.KindIssue {
-		t.Errorf("run 0 subject = %+v, want issue dpinsel/apps#7", first.Subject)
+	if first.Subject.Repo != "acme/apps" || first.Subject.Number != 7 || first.Subject.Kind != forge.KindIssue {
+		t.Errorf("run 0 subject = %+v, want issue acme/apps#7", first.Subject)
 	}
 	if first.Subject.Title != "Add export" {
 		t.Errorf("run 0 title = %q, want %q", first.Subject.Title, "Add export")
@@ -775,7 +775,7 @@ func TestRunsKeepsAFinishedTasksStatus(t *testing.T) {
 func TestCreateConnectorSendsTheForgejoSignatureHeader(t *testing.T) {
 	h := newHubServer(t)
 	h.post("/api/v1/connectors", http.StatusCreated, `{"id":"c-42","name":"apps","signatureHeader":"X-Forgejo-Signature",
-		"webhookEndpoint":"https://hub.example/webhooks/c-42","webhookSecretValue":"s3cr3t"}`)
+		"webhookEndpoint":"https://hub.example/webhooks/c-42","webhookSecretValue":"webhook-secret-value"}`)
 
 	c := h.client()
 	conn, err := c.CreateConnector(WithCredential(context.Background(), "ainselp_user"), "g-1", "apps")
@@ -789,7 +789,7 @@ func TestCreateConnectorSendsTheForgejoSignatureHeader(t *testing.T) {
 	if conn.WebhookEndpoint != "https://hub.example/webhooks/c-42" {
 		t.Errorf("endpoint = %q, want the hub's", conn.WebhookEndpoint)
 	}
-	if conn.WebhookSecretValue != "s3cr3t" {
+	if conn.WebhookSecretValue != "webhook-secret-value" {
 		t.Errorf("secret = %q, want the hub's plaintext", conn.WebhookSecretValue)
 	}
 

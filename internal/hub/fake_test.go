@@ -29,9 +29,9 @@ func newFake() *Fake {
 		},
 		SeedRuns: []work.Run{
 			{ID: "inv-1", Connector: "c-1", Start: time.Date(2026, 10, 22, 10, 0, 0, 0, time.UTC),
-				Subject: forge.Subject{Repo: "dpinsel/apps", Number: 7, Kind: forge.KindIssue}},
+				Subject: forge.Subject{Repo: "acme/apps", Number: 7, Kind: forge.KindIssue}},
 			{ID: "inv-2", Connector: "c-2", Start: time.Date(2026, 10, 22, 11, 0, 0, 0, time.UTC),
-				Subject: forge.Subject{Repo: "dpinsel/docs", Number: 3, Kind: forge.KindIssue}},
+				Subject: forge.Subject{Repo: "acme/docs", Number: 3, Kind: forge.KindIssue}},
 		},
 	}
 }
@@ -239,7 +239,7 @@ func TestFakeSeededConnectorAnswerIsUsed(t *testing.T) {
 	f := &Fake{NextConnector: Connector{
 		Ref:                Ref{ID: "c-42", Name: "seeded"},
 		WebhookEndpoint:    "https://hub.example/webhooks/c-42",
-		WebhookSecretValue: "s3cr3t",
+		WebhookSecretValue: "webhook-secret-value",
 	}}
 	ctx := context.Background()
 
@@ -247,7 +247,7 @@ func TestFakeSeededConnectorAnswerIsUsed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateConnector: %v", err)
 	}
-	if conn.WebhookEndpoint != "https://hub.example/webhooks/c-42" || conn.WebhookSecretValue != "s3cr3t" {
+	if conn.WebhookEndpoint != "https://hub.example/webhooks/c-42" || conn.WebhookSecretValue != "webhook-secret-value" {
 		t.Errorf("connector = %+v, want the seeded endpoint and secret", conn)
 	}
 	if conn.ID != "c-42" {
@@ -447,18 +447,18 @@ func TestFakeAcceptsAKeyOnlyAgentUpdate(t *testing.T) {
 			ID: "a-1", Name: "apps-developer", ImageRef: "ai-1", PersonaID: "p-seed",
 			LLM:          &LLMSpec{Model: "gpt-x", Provider: "openai"},
 			EnabledTools: append([]string(nil), grant...),
-			AnthropicKey: "sk-old-anthropic",
+			AnthropicKey: "old-provider-key",
 		},
 	}
 
 	if err := f.UpdateAgent(context.Background(), "a-1", AgentUpdate{
-		OpenAIKey: ptrTo("sk-new"),
+		OpenAIKey: ptrTo("new-provider-key"),
 	}); err != nil {
 		t.Fatalf("UpdateAgent: %v", err)
 	}
 
 	got := f.SeedAgents["a-1"]
-	if got.OpenAIKey != "sk-new" {
+	if got.OpenAIKey != "new-provider-key" {
 		t.Errorf("openai key = %q, want the pushed key", got.OpenAIKey)
 	}
 	if got.Name != "apps-developer" || got.ImageRef != "ai-1" || got.PersonaID != "p-seed" {
@@ -470,7 +470,7 @@ func TestFakeAcceptsAKeyOnlyAgentUpdate(t *testing.T) {
 	if !reflect.DeepEqual(got.EnabledTools, grant) {
 		t.Errorf("the update moved the agent's grant: %v", got.EnabledTools)
 	}
-	if got.AnthropicKey != "sk-old-anthropic" {
+	if got.AnthropicKey != "old-provider-key" {
 		t.Errorf("the update moved a block it did not name: %q", got.AnthropicKey)
 	}
 }

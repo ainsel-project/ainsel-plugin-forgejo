@@ -28,12 +28,16 @@ done
 # their fixtures, the plugin content, and the scripts. git ls-files keeps tracked
 # files only, so an untracked scratch file cannot fail someone's CI.
 files=$(git ls-files -- \
-  'docs' 'README.md' 'content' 'ui/src' 'scripts' \
+  'docs' 'README.md' 'content' 'ui/src' 'scripts' '.github' \
   '*.go' '*_test.go' '*.json' '*.md' '*.yml' '*.yaml')
+
+# .github/CODEOWNERS is the one tracked file allowed to name a person: naming the maintainer is
+# what that file is for, and an entry that named nobody would own nothing.
+files=$(printf '%s\n' "$files" | grep -v '^\.github/CODEOWNERS$')
 
 status=0
 for needle in "${patterns[@]}"; do
-  hits=$(grep -In -- "$needle" $files || true)
+  hits=$(grep -Iin -- "$needle" $files || true)
   if [ -n "$hits" ]; then
     status=1
     printf '%s found in the published tree:\n' "$needle"

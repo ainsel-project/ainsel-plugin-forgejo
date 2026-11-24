@@ -1,0 +1,21 @@
+# Who owns which path. This file is a review *routing* signal: it says whose eyes a change to
+# a path wants. The repository setting "require review from code owners" is deliberately left
+# off — pull requests here are routinely opened by AInsel agents, and a mandatory human
+# sign-off on every merge is not this repo's working rule (see CONTRIBUTING.md; the working
+# rule is docs/development.md's "never merge your own").
+
+# Everything, unless a line below says otherwise. Swap in an org team once one exists.
+*                               @DominikPinsel
+
+# The chart is what an operator installs; its render tests are the contract.
+/chart/                         @DominikPinsel
+
+# The docs are published: docs/ is the console's Docs page and the docs site's content, and
+# a doc that disagrees with the code is treated as a bug.
+/docs/                          @DominikPinsel
+/docs-site/                     @DominikPinsel
+
+# The manifest and the served content are checked against the code by CI
+# (internal/manifest, content/); a change here has to agree with the routes the plugin serves.
+/ainsel-plugin.json             @DominikPinsel
+/content/                       @DominikPinsel

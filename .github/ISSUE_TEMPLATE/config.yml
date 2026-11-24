@@ -1,0 +1,4 @@
+# Markdown templates, not issue forms: AInsel agents open issues in this repo as a matter of
+# course, and a form with required fields turns a health file into a gate. Blank issues stay
+# open for the same reason.
+blank_issues_enabled: true

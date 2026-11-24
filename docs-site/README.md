@@ -8,8 +8,8 @@ directory the console's Docs page serves.
 
 A Vite + React app that renders `docs/` as a docsify-style site: `docs/_sidebar.md` drives
 the navigation, and each page is fetched from `docs/` at runtime (the build copies `docs/`
-into `dist/docs/`). `docs/design/` and `docs/plans/` are not published — they are the
-internal reasoning, and they stay in git where the links to them work.
+into `dist/docs/`). `docs/design/` is not published — it is the reasoning behind
+the wizard, and it stays in git where the links to it work.
 
 The design system and the Docs page layout are **vendored** under `src/design/` and
 `src/components/`, copied from AInsel rather than imported from a sibling checkout: this

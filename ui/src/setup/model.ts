@@ -1,8 +1,8 @@
 // Model for the setup wizard form
 // The Input shape and step logic follow the spec in docs/design/2026-10-24-setup-wizard-flow.md,
-// trimmed by the managed-agents design (docs/plans/2026-10-30-managed-agents-design.md,
-// decision 9): the wizard collects only per-install facts. The forge MCP URL and the
-// role LLMs left for the settings store; the forge-MCP pick step went with them.
+// trimmed by the managed-agents design: the wizard collects only per-install facts.
+// The forge MCP URL and the role LLMs left for the settings store; the forge-MCP pick
+// step went with them.
 
 import type { WorkingHours } from "../api";
 

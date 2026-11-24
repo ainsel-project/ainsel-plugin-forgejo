@@ -103,9 +103,9 @@ both read these files, and the sidebar is `docs/_sidebar.md`.
 - **Link between docs** with the bare slug — `[Live board](live-board)` — not a `.md` path. The
   site turns those into in-site routes; a `foo.md` link is left as a dead click.
 - **In-page anchors** (`[section](#the-section)`) scroll the article.
-- `docs/design/` and `docs/plans/` are the reasoning behind the wizard and the plans that built
-  it. They stay in git, where the links from the README and the code work, and they are not
-  published to the site.
+- The published doc set is `docs/` plus the design notes in `docs/design/` — the reasoning
+  behind the wizard. `docs/design/` stays in git, where the links from the README and the code
+  work, and it is not published to the site.
 
 ### The docs site
 
@@ -124,7 +124,7 @@ pnpm build     # tsc -b && vite build → dist/
 
 A `vite` plugin serves `../docs/` in development and copies it into `dist/docs` at build time —
 so a doc is edited in place and appears in the artifact, and a doc removed from git does not
-survive in it. `design/` and `plans/` are the two directories left out.
+survive in it. `design/` is the directory left out.
 
 The site is published from `main` by `.github/workflows/deploy-docs-pages.yml`, which builds
 `docs-site/` and uploads `dist/` to GitHub Pages. It is served from a subpath named after the

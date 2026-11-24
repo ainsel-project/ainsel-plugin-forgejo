@@ -15,10 +15,10 @@ const basePath = process.env.DOCS_SITE_BASE_PATH ?? '/ainsel-plugin-forgejo/'
 // server and copies it into the build output so GitHub Pages can serve it as
 // static assets — keeping a single source of truth for the docs.
 //
-// Two directories in `docs/` are not documentation *of the plugin* and are not
-// published: `design/` holds the design the wizard implements, `plans/` the
-// implementation plans behind it. They stay in git, where the links to them from
-// the README and the code work, and stay out of the public artifact.
+// `docs/design/` is not documentation *of the plugin* and is not published: it holds
+// the design the wizard implements. It stays in git, where the links to it from the
+// code work, and stays out of the public artifact. `plans/` is guarded the same way
+// for any directory added back under that name.
 const UNPUBLISHED = ['design', 'plans']
 
 function repoDocsPlugin(base: string): Plugin {

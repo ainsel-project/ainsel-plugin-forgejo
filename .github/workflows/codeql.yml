@@ -7,9 +7,14 @@ name: CodeQL
 # three-time pattern as the scheduled CI mirror, offset to a different minute.
 #
 # Build modes: TypeScript analyses without an emit (none is CodeQL's default
-# for it), but Go has no none mode in codeql-action v4.39.4 — init fails with
-# "Go does not support the none build mode" — so Go takes autobuild with a
-# pinned setup-go step that maps no secrets into the job.
+# for it), but Go has no none mode in codeql-action v4.39.4 — so Go takes
+# autobuild with a pinned setup-go step that maps no secrets into the job.
+# Evidence: the pinned toolchain on this repo's own runs, not inference —
+# https://github.com/ainsel-project/ainsel-plugin-forgejo/actions/runs/45410281779/job/138501870345
+# (Analyze (go) on 9248582, which set build-mode: none) failed with:
+#   A fatal error occurred: Go does not support the none build mode.
+#   Please try using one of the following build modes instead: autobuild, manual.
+# Go flips to none if a future codeql-action release gains support.
 
 on:
   push:

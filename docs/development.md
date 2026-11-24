@@ -85,9 +85,11 @@ triaged in `docs/security/`, and a new finding is triaged into the same page or 
 Two supply-chain rules hold the workflows themselves. Every `uses:` in
 `.github/workflows/` is pinned to a full commit SHA (tag in a trailing comment), and
 `.github/dependabot.yml` opens one grouped PR a week to move the pins — actions, Go
-modules, both npm directories and the Dockerfile base. CI also runs `govulncheck` (its
-version pinned the same way) against the Go advisory database, the whole gate set runs
-weekly on a schedule, and CodeQL analyses Go and TypeScript on main, on pulls and
+modules, both npm directories and the Dockerfile base. CI also runs `govulncheck` against
+the Go advisory database; its version is pinned in the `run:` step rather than a `uses:`
+line, and it is the `github-actions` ecosystem above that bumps it — not a hand edit. The
+whole gate set runs weekly on a schedule, and CodeQL analyses Go (with a build, since the
+action has no `none` build mode for Go) and TypeScript (without one) on main, on pulls and
 weekly.
 
 ## The UI

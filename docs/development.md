@@ -82,6 +82,14 @@ merges. The history is scanned for secrets beside them, on every pull request an
 `.github/workflows/secret-scan.yml`; [the first result](security/secret-scan-2026-11-24) is
 triaged in `docs/security/`, and a new finding is triaged into the same page or fixed.
 
+Two supply-chain rules hold the workflows themselves. Every `uses:` in
+`.github/workflows/` is pinned to a full commit SHA (tag in a trailing comment), and
+`.github/dependabot.yml` opens one grouped PR a week to move the pins — actions, Go
+modules, both npm directories and the Dockerfile base. CI also runs `govulncheck` (its
+version pinned the same way) against the Go advisory database, the whole gate set runs
+weekly on a schedule, and CodeQL analyses Go and TypeScript on main, on pulls and
+weekly.
+
 ## The UI
 
 `ui/` is a Vite **library** build: it exports the page components the console mounts, and the

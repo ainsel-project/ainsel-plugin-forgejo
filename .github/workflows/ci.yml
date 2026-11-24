@@ -1,4 +1,9 @@
 name: CI
+# Every action below is pinned to a full commit SHA with its tag in a trailing
+# comment; Dependabot (.github/dependabot.yml) opens the bump PRs. Floating refs
+# let an upstream tag move under a workflow that did not ask for it — and the
+# release workflow's file is the cosign signing identity installers trust
+# (see release.yml), so the whole chain is pinned, not just that file.
 
 # Every gate this plugin ships with, in the order it pays off: the cheap Go checks
 # first, then the UI, then the chart, then the image build that ties them together.
@@ -10,6 +15,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly mirror of the same gates, so a dependency that was fine at merge time
+  # and gets an advisory next week still raises a red flag on the repository —
+  # govulncheck is the check that rots silently if nobody runs it.
+  schedule:
+    - cron: "37 5 * * 1"
 
 permissions:
   contents: read
@@ -20,13 +30,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # --- Go ---------------------------------------------------------------
       # go test reads the embedded ui/dist, which is committed as a placeholder
       # (.gitkeep), so the Go checks do not wait on the UI build.
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
 
@@ -42,15 +52,21 @@ jobs:
       - name: Check for retired internal names
         run: bash scripts/check-no-internal-names.sh
 
+      # vulncheck against the live Go advisory DB. The tool version is pinned like
+      # the actions are (Dependabot bumps it), so the check itself cannot change
+      # under the job.
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+
       # --- UI ---------------------------------------------------------------
       # pnpm is installed before setup-node so the pnpm store can be cached.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 9.15.9
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           cache: pnpm
@@ -64,7 +80,7 @@ jobs:
 
       # --- Helm chart -------------------------------------------------------
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
 
       - name: Test the chart
         run: bash chart/tests/render_test.sh
@@ -74,10 +90,10 @@ jobs:
       # whole thing assembles from a clean checkout, manifest and bundle
       # included. Nothing is pushed from CI.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build the plugin image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           tags: ghcr.io/ainsel-project/ainsel-plugin-forgejo:ci
@@ -91,16 +107,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # pnpm before setup-node, so the setup-node cache can find the lockfile.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 9.15.9
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           cache: pnpm

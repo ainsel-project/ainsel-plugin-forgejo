@@ -41,7 +41,11 @@
  * task it is spawned on, or its own definition in the plan. Those routes are decided
  * per install and per task, so whether a blank field matters is a question about the
  * install, not about the field — and this page cannot see the installs. It is the
- * pass that runs there, against each one, that names a field it could not resolve.
+ * pass that runs there, against each one, that names a field it could not
+ * resolve: internal/reconcile builds each install's desired state from the
+ * saved settings falling back to the shipped default, and any field it will
+ * not land comes back named in the same summary the Reconcile action on
+ * this page renders.
  * So a blank default here stays blank, and says what blank means, rather than being
  * filled with a value the page has no way to justify.
  *

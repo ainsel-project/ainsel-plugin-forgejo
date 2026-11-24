@@ -31,14 +31,9 @@ describe("Connect (S7)", () => {
 
     sdk.get.mockResolvedValue({ verified: false, at: null });
 
-    const { container } = render(
-      <Connect
-        install={install}
-        onDone={vi.fn()}
-      />
-    );
+    const { container } = render(<Connect install={install} onDone={vi.fn()} />);
 
-    expect(container.querySelector('.forgejo-connect')).toBeTruthy();
+    expect(container.querySelector(".forgejo-connect")).toBeTruthy();
   });
 
   it("shows the direct hook link in the connection screen", () => {
@@ -56,15 +51,10 @@ describe("Connect (S7)", () => {
 
     sdk.get.mockResolvedValue({ verified: false, at: null });
 
-    const { container } = render(
-      <Connect
-        install={install}
-        onDone={vi.fn()}
-      />
-    );
+    const { container } = render(<Connect install={install} onDone={vi.fn()} />);
 
     // Check for the hook URL
-    const hookLink = container.querySelector('a');
+    const hookLink = container.querySelector("a");
     expect(hookLink?.href).toContain("hooks/1");
   });
 
@@ -84,15 +74,10 @@ describe("Connect (S7)", () => {
     sdk.get.mockResolvedValue({ verified: false, at: null });
 
     const onDone = vi.fn();
-    const { container } = render(
-      <Connect
-        install={install}
-        onDone={onDone}
-      />
-    );
+    const { container } = render(<Connect install={install} onDone={onDone} />);
 
     // The way out while waiting is named for what it does: it finishes without a verified webhook.
-    const continueBtn = container.querySelector('.forgejo-continue-btn') as HTMLButtonElement;
+    const continueBtn = container.querySelector(".forgejo-continue-btn") as HTMLButtonElement;
     expect(continueBtn.textContent).toBe("Finish without verifying");
   });
 
@@ -102,15 +87,9 @@ describe("Connect (S7)", () => {
     // with nothing to do, so the screen asks for something the admin can actually do.
     sdk.get.mockResolvedValue({ verified: false, at: null });
 
-    const { container } = render(
-      <Connect install={installForPolling} onDone={vi.fn()} />
-    );
+    const { container } = render(<Connect install={installForPolling} onDone={vi.fn()} />);
 
-    expect(
-      screen.getByText(
-        /open an issue, or comment on one, in any repository of example/,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(/open an issue, or comment on one, in any repository of example/)).toBeTruthy();
     expect(container.textContent).not.toContain("Test Delivery");
   });
 
@@ -120,9 +99,7 @@ describe("Connect (S7)", () => {
     sdk.get.mockResolvedValue({ verified: false, at: null });
 
     const onDone = vi.fn();
-    const { container } = render(
-      <Connect install={installForPolling} onDone={onDone} />
-    );
+    const { container } = render(<Connect install={installForPolling} onDone={onDone} />);
 
     const continueBtn = container.querySelector(".forgejo-continue-btn") as HTMLButtonElement;
     fireEvent.click(continueBtn);
@@ -153,7 +130,7 @@ describe("Connect (S7)", () => {
       });
       expect(get).toHaveBeenCalledWith(
         "/setup/installs/apps/deliveries",
-        expect.objectContaining({ query: expect.any(Object) })
+        expect.objectContaining({ query: expect.any(Object) }),
       );
 
       // Still waiting before the next tick answers with a delivery.
@@ -194,9 +171,7 @@ describe("Connect (S7)", () => {
       expect(screen.getByText("Recent Deliveries:")).toBeTruthy();
 
       const hookLink = screen.getByRole("link", { name: /git\.example\.com/ });
-      expect(hookLink.getAttribute("href")).toBe(
-        "https://git.example.com/org/example/settings/hooks/1"
-      );
+      expect(hookLink.getAttribute("href")).toBe("https://git.example.com/org/example/settings/hooks/1");
     } finally {
       vi.useRealTimers();
     }
@@ -243,8 +218,7 @@ describe("Connect (S7)", () => {
 
       const { container } = render(<Connect install={installForPolling} onDone={vi.fn()} />);
 
-      const warns = () =>
-        Array.from(container.querySelectorAll('[data-variant="warn"]')).map((n) => n.textContent);
+      const warns = () => Array.from(container.querySelectorAll('[data-variant="warn"]')).map((n) => n.textContent);
 
       // Mount: the first poll fails. Then the second.
       await act(async () => {
@@ -259,9 +233,7 @@ describe("Connect (S7)", () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
       });
-      expect(
-        warns().some((text) => text?.includes("Could not check deliveries: hub is not answering")),
-      ).toBe(true);
+      expect(warns().some((text) => text?.includes("Could not check deliveries: hub is not answering"))).toBe(true);
       expect(screen.getByText(/Waiting for the first event/)).toBeTruthy();
       const callsAtNotice = get.mock.calls.length;
 

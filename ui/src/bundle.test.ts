@@ -41,13 +41,7 @@ function bundle(): string {
 // bundle names them and never contains them. `react-dom/client` belongs with
 // `react-dom` — a two-level path that is not declared external gets its own
 // copy of the renderer, which is exactly the single-renderer rule breaking.
-const consoleSpecifiers = [
-  "react",
-  "react-dom",
-  "react-dom/client",
-  "react/jsx-runtime",
-  "@ainsel/plugin-sdk",
-];
+const consoleSpecifiers = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "@ainsel/plugin-sdk"];
 
 // The module specifiers of the built bundle: every `from "…"` it carries, plus
 // a bare side-effect `import "…"`. What the bundle imports is the observable
@@ -79,9 +73,7 @@ function importSpecifiers(source: string): string[] {
 // slot's. They are read from the shipped manifest rather than written down a second
 // time here, because the two disagreeing is exactly what this test is for.
 function manifestComponents(): string[] {
-  const manifest = JSON.parse(
-    readFileSync(join(uiRoot, "..", "ainsel-plugin.json"), "utf8"),
-  ) as {
+  const manifest = JSON.parse(readFileSync(join(uiRoot, "..", "ainsel-plugin.json"), "utf8")) as {
     ui?: { pages?: { component?: string }[]; slots?: Record<string, string> };
   };
   return [
@@ -94,20 +86,14 @@ function manifestComponents(): string[] {
 // `export { ... }` statement (honouring `local as exported` renames) or
 // inline on the declaration itself.
 function hasExport(source: string, name: string): boolean {
-  if (
-    new RegExp(`export\\s+(?:async\\s+)?(?:function|const|let|var|class)\\s+${name}\\b`).test(
-      source,
-    )
-  ) {
+  if (new RegExp(`export\\s+(?:async\\s+)?(?:function|const|let|var|class)\\s+${name}\\b`).test(source)) {
     return true;
   }
   return [...source.matchAll(/export\s*\{([^}]*)\}/g)].some((statement) =>
-    statement[1]
-      .split(",")
-      .some((specifier) => {
-        const parts = specifier.trim().split(/\s+as\s+/);
-        return parts[parts.length - 1] === name;
-      }),
+    statement[1].split(",").some((specifier) => {
+      const parts = specifier.trim().split(/\s+as\s+/);
+      return parts[parts.length - 1] === name;
+    }),
   );
 }
 

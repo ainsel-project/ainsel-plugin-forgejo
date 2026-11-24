@@ -28,18 +28,21 @@
 // servers are the manifest's fixed set, listed read-only under "Managed
 // resources" with the plugin version that provides them. Membership changes by
 // plugin upgrade, nothing else.
-import { Button, Input, Notice, Panel, RegisterTable, Select, Tag, Textarea, usePluginContext } from "@ainsel/plugin-sdk";
+import {
+  Button,
+  Input,
+  Notice,
+  Panel,
+  RegisterTable,
+  Select,
+  Tag,
+  Textarea,
+  usePluginContext,
+} from "@ainsel/plugin-sdk";
 import { CardGrid } from "./layout";
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
-import {
-  asApiError,
-  fetchSettings,
-  putSettings,
-  reconcileSettings,
-  fetchInstances,
-  putInstances,
-} from "./api";
+import { asApiError, fetchSettings, putSettings, reconcileSettings, fetchInstances, putInstances } from "./api";
 import type { ReconcileSummary, Setting, SettingsEdit, ForgejoInstance } from "./api";
 
 // The roles the registry answers for. The side navigation offers them one at a
@@ -259,12 +262,7 @@ function runningVersion(settings: Setting[]): string {
 
 // One entry of the "Check now" answer, in the shape the log writes it: where,
 // what, and the change or the refusal.
-function changeLine(c: {
-  install?: string;
-  role?: string;
-  kind: string;
-  field: string;
-}): string {
+function changeLine(c: { install?: string; role?: string; kind: string; field: string }): string {
   const at = [c.install, c.role].filter(Boolean).join("/");
   return `${at ? at + ": " : ""}${c.kind}.${c.field}`;
 }
@@ -520,8 +518,7 @@ export function SettingsPage() {
   // written: the PUT replaces every row. So the draft is the list, an add or a
   // remove is a draft edit, and Save is one request that lands all of it or none.
   const draftInstances = instanceDraft ?? instances;
-  const instancePending =
-    instanceDraft !== null && JSON.stringify(instanceDraft) !== JSON.stringify(instances);
+  const instancePending = instanceDraft !== null && JSON.stringify(instanceDraft) !== JSON.stringify(instances);
 
   const editInstance = (i: number, patch: Partial<ForgejoInstance>) => {
     setInstanceDraft((d) => {
@@ -597,8 +594,7 @@ export function SettingsPage() {
 
   const version = runningVersion(settings);
   const pendingCount = Object.keys(drafts).length;
-  const dirtyCount = (role: string) =>
-    settings.filter((s) => s.role === role && s.dirty).length;
+  const dirtyCount = (role: string) => settings.filter((s) => s.role === role && s.dirty).length;
   const roleSettings = settings.filter((s) => s.role === currentRole);
   const role = ROLES.find((r) => r.key === currentRole)!;
 
@@ -629,12 +625,7 @@ export function SettingsPage() {
 
     const control =
       s.options && s.options.length > 0 ? (
-        <Select
-          id={id}
-          value={value}
-          onChange={(next: string) => edit(s, next)}
-          options={s.options}
-        />
+        <Select id={id} value={value} onChange={(next: string) => edit(s, next)} options={s.options} />
       ) : spec.multiline ? (
         <Textarea
           id={id}
@@ -678,11 +669,7 @@ export function SettingsPage() {
           <label htmlFor={id} style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
             {spec.label}
           </label>
-          {spec.help && (
-            <span style={{ fontSize: 12, color: "var(--ink-2)", lineHeight: "18px" }}>
-              {spec.help}
-            </span>
-          )}
+          {spec.help && <span style={{ fontSize: 12, color: "var(--ink-2)", lineHeight: "18px" }}>{spec.help}</span>}
           <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
             <Tag>{overridden ? "Overridden" : "Default"}</Tag>
             {unsaved && <Tag variant="warn">Unsaved</Tag>}
@@ -733,17 +720,10 @@ export function SettingsPage() {
                   {`Plugin v${version} ships a new default for this field. Your edit, made on v${s.defaultVersion}, is kept until you adopt it.`}
                 </span>
                 <span style={{ display: "flex", gap: 6 }}>
-                  <Button
-                    onClick={() => setComparing((c) => ({ ...c, [k]: !open }))}
-                    className="forgejo-compare-btn"
-                  >
+                  <Button onClick={() => setComparing((c) => ({ ...c, [k]: !open }))} className="forgejo-compare-btn">
                     {open ? "Hide comparison" : "Compare"}
                   </Button>
-                  <Button
-                    onClick={() => handleReset(s)}
-                    disabled={busy || saving}
-                    className="forgejo-reset-btn"
-                  >
+                  <Button onClick={() => handleReset(s)} disabled={busy || saving} className="forgejo-reset-btn">
                     Adopt new default
                   </Button>
                 </span>
@@ -751,20 +731,14 @@ export function SettingsPage() {
               {open && (
                 <CardGrid minTrackWidth={240} maxColumns={2} gap={8}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>
-                      Your version
-                    </span>
-                    <pre style={preStyle("color-mix(in srgb, var(--err) 10%, transparent)")}>
-                      {s.value}
-                    </pre>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Your version</span>
+                    <pre style={preStyle("color-mix(in srgb, var(--err) 10%, transparent)")}>{s.value}</pre>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>
                       {`Default in v${version}`}
                     </span>
-                    <pre style={preStyle("color-mix(in srgb, var(--ok) 12%, transparent)")}>
-                      {s.default}
-                    </pre>
+                    <pre style={preStyle("color-mix(in srgb, var(--ok) 12%, transparent)")}>{s.default}</pre>
                   </div>
                 </CardGrid>
               )}
@@ -774,11 +748,7 @@ export function SettingsPage() {
           {overridden && !stale && (
             <span style={{ fontSize: 12, color: "var(--ink-2)" }}>
               Default:{" "}
-              <span
-                className="forgejo-settings-mono"
-                title={s.default}
-                style={{ fontFamily: MONO }}
-              >
+              <span className="forgejo-settings-mono" title={s.default} style={{ fontFamily: MONO }}>
                 {truncate(s.default)}
               </span>{" "}
               ·{" "}
@@ -805,7 +775,11 @@ export function SettingsPage() {
 
   const cards = [
     ...GROUPS.map((g) => ({ title: g.title, desc: g.desc, rows: cardRows(g.fields) })),
-    { title: "Other", desc: "Fields the registry answers with that this page has no card for. They edit and save like the rest.", rows: otherRows },
+    {
+      title: "Other",
+      desc: "Fields the registry answers with that this page has no card for. They edit and save like the rest.",
+      rows: otherRows,
+    },
   ].filter((c) => c.rows.length > 0);
 
   const roleView = (
@@ -831,13 +805,12 @@ export function SettingsPage() {
       <div style={{ padding: "16px 20px" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Managed resources</h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink-2)", maxWidth: 640 }}>
-          Every install receives these. They come from the plugin manifest and change only when the
-          plugin is upgraded, so they cannot be edited here.
+          Every install receives these. They come from the plugin manifest and change only when the plugin is upgraded,
+          so they cannot be edited here.
         </p>
         <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ink-2)", maxWidth: 640 }}>
-          Each install also gets its forge MCP server,{" "}
-          <code>forgejo-mcp-&lt;install&gt;</code>, pointed at by the MCP fields below. The sets are
-          the plugin manifest&apos;s — membership changes only when the plugin upgrades.
+          Each install also gets its forge MCP server, <code>forgejo-mcp-&lt;install&gt;</code>, pointed at by the MCP
+          fields below. The sets are the plugin manifest&apos;s — membership changes only when the plugin upgrades.
         </p>
       </div>
       <div style={{ overflowX: "auto" }}>
@@ -894,14 +867,14 @@ export function SettingsPage() {
       <div style={{ padding: "16px 20px" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Forgejo instances</h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink-2)", maxWidth: 640 }}>
-          The Forgejo addresses an install may be created against. The setup wizard picks from this
-          list, and a plan that names an address outside it is refused. An address is stored without
-          its trailing slash; the same address twice is one instance, not two.
+          The Forgejo addresses an install may be created against. The setup wizard picks from this list, and a plan
+          that names an address outside it is refused. An address is stored without its trailing slash; the same address
+          twice is one instance, not two.
         </p>
         {instances.length === 0 && !instancePending && (
           <Notice variant="warn">
-            No instance is configured, so the setup wizard has nothing to install against. Add the
-            address of your Forgejo here first.
+            No instance is configured, so the setup wizard has nothing to install against. Add the address of your
+            Forgejo here first.
           </Notice>
         )}
         {instanceError && <Notice variant="err">{instanceError}</Notice>}
@@ -941,11 +914,7 @@ export function SettingsPage() {
             )}
           </div>
           <div style={{ flex: "0 0 auto" }}>
-            <Button
-              onClick={() => removeInstance(i)}
-              disabled={instanceSaving}
-              className="forgejo-instance-remove-btn"
-            >
+            <Button onClick={() => removeInstance(i)} disabled={instanceSaving} className="forgejo-instance-remove-btn">
               Remove
             </Button>
           </div>
@@ -1000,11 +969,7 @@ export function SettingsPage() {
       right={
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           {syncTag}
-          <Button
-            onClick={handleReconcile}
-            disabled={reconciling}
-            className="forgejo-reconcile-btn"
-          >
+          <Button onClick={handleReconcile} disabled={reconciling} className="forgejo-reconcile-btn">
             {reconciling ? "Reconciling…" : "Reconcile now"}
           </Button>
         </div>
@@ -1012,8 +977,8 @@ export function SettingsPage() {
     >
       <style>{pageStyles}</style>
       <p style={{ margin: 0, fontSize: 14, color: "var(--ink-2)", maxWidth: 640 }}>
-        Role defaults for every Forgejo install. Saved changes are pushed to the agents and personas
-        on the next reconcile.
+        Role defaults for every Forgejo install. Saved changes are pushed to the agents and personas on the next
+        reconcile.
       </p>
 
       {reconcileError && <Notice variant="err">{reconcileError}</Notice>}
@@ -1021,7 +986,15 @@ export function SettingsPage() {
         <Notice
           variant={summary.refused.length > 0 || summary.llmChecks.some((c) => c.state !== "ok") ? "warn" : "info"}
         >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
             <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
               {summary.updated.length === 0 &&
               summary.refused.length === 0 &&
@@ -1244,9 +1217,7 @@ export function SettingsPage() {
           }}
         >
           <span style={{ fontSize: 14, color: "var(--ink)" }}>
-            <b style={{ fontWeight: 600 }}>
-              {`${pendingCount} unsaved ${pendingCount === 1 ? "change" : "changes"}`}
-            </b>{" "}
+            <b style={{ fontWeight: 600 }}>{`${pendingCount} unsaved ${pendingCount === 1 ? "change" : "changes"}`}</b>{" "}
             · saved changes reach the agents on the next reconcile
           </span>
           <span style={{ display: "flex", gap: 8 }}>

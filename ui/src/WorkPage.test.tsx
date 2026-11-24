@@ -31,12 +31,7 @@ function subject(repo: string, number: number, kind: string, title: string): Sub
   return { repo, number, kind, title };
 }
 
-function run(
-  role: string,
-  status: string,
-  start: string,
-  subjectRef: Subject,
-): Run {
+function run(role: string, status: string, start: string, subjectRef: Subject): Run {
   return {
     id: `${subjectRef.repo}#${subjectRef.number}-${role}`,
     agent: role,
@@ -170,9 +165,7 @@ function newestFirst(refs: { repo: string; number: number }[]): WorkResponse {
 
 // `count` threads numbered 1..count in one repo, newest first.
 function oneRepo(count: number, repo = "owner/apps"): WorkResponse {
-  return newestFirst(
-    Array.from({ length: count }, (_, i) => ({ repo, number: i + 1 })),
-  );
+  return newestFirst(Array.from({ length: count }, (_, i) => ({ repo, number: i + 1 })));
 }
 
 // The item numbers of the rows the table currently shows, in the order they are drawn. Read off
@@ -208,7 +201,6 @@ async function rowFor(number: number): Promise<HTMLElement> {
   if (!row) throw new Error(`#${number} is not rendered inside a row`);
   return row as HTMLElement;
 }
-
 
 // A thread whose only run timed out: its newest run failed and nothing is running, so it is the
 // one thread that needs attention.
@@ -349,9 +341,7 @@ describe("WorkPage", () => {
 
     const row = await rowFor(10);
     // Refine failed, develop is queued, review (on the nested pull request) succeeded.
-    expect(
-      within(row).getByRole("img", { name: "Refine: failed, Develop: waiting, Review: done" }),
-    ).toBeDefined();
+    expect(within(row).getByRole("img", { name: "Refine: failed, Develop: waiting, Review: done" })).toBeDefined();
     expect(within(row).getByText("Review · done")).toBeDefined();
   });
 
@@ -390,17 +380,13 @@ describe("WorkPage", () => {
 
     render(<WorkPage />);
 
-    expect(
-      await screen.findByText("No issues or pull requests worked on yet"),
-    ).toBeDefined();
+    expect(await screen.findByText("No issues or pull requests worked on yet")).toBeDefined();
     // Nothing to page through, so nothing to page with either.
     expect(screen.queryByRole("button", { name: /prev/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
     expect(screen.queryByLabelText("Rows per page")).toBeNull();
     // And nothing to export.
-    expect(
-      (screen.getByRole("button", { name: "Export CSV" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole("button", { name: "Export CSV" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows the repository as muted text under the title", async () => {
@@ -528,11 +514,7 @@ describe("WorkPage views and filters", () => {
     await screen.findByRole("button", { name: "Add the widget" });
 
     const repo = screen.getByLabelText("Repository") as HTMLSelectElement;
-    expect([...repo.options].map((o) => o.textContent)).toEqual([
-      "All repositories",
-      "owner/apps",
-      "owner/data",
-    ]);
+    expect([...repo.options].map((o) => o.textContent)).toEqual(["All repositories", "owner/apps", "owner/data"]);
 
     await userEvent.selectOptions(repo, "owner/data");
     expect(screen.getByRole("button", { name: "Ship the schema" })).toBeDefined();
@@ -546,12 +528,7 @@ describe("WorkPage views and filters", () => {
     await screen.findByRole("button", { name: "Add the widget" });
 
     const role = screen.getByLabelText("Role") as HTMLSelectElement;
-    expect([...role.options].map((o) => o.textContent)).toEqual([
-      "Any role",
-      "Refiner",
-      "Developer",
-      "Reviewer",
-    ]);
+    expect([...role.options].map((o) => o.textContent)).toEqual(["Any role", "Refiner", "Developer", "Reviewer"]);
 
     // The reviewer ran on the pull request nested under the issue, so the issue is the thread.
     await userEvent.selectOptions(role, "reviewer");
@@ -633,13 +610,9 @@ describe("WorkPage export", () => {
 
     expect(name).toBe("forgejo-work-30d.csv");
     const lines = text.split("\r\n");
-    expect(lines[0]).toBe(
-      "kind,number,title,repo,status,runs,agent time,cost,last activity",
-    );
+    expect(lines[0]).toBe("kind,number,title,repo,status,runs,agent time,cost,last activity");
     expect(lines).toHaveLength(4);
-    expect(lines).toContain(
-      "Issue,10,Add the widget,owner/apps,Queued,3,3m 05s,0.16,2024-06-02T12:00:00Z",
-    );
+    expect(lines).toContain("Issue,10,Add the widget,owner/apps,Queued,3,3m 05s,0.16,2024-06-02T12:00:00Z");
     // A thread nobody priced leaves its cost empty rather than writing a zero.
     expect(lines).toContain("PR,5,Ship the schema,owner/data,,0,0s,,2024-06-01T12:00:00Z");
   });
@@ -776,9 +749,7 @@ describe("WorkPage pagination", () => {
     await userEvent.click(next);
     expect(rowNumbers(container)).toEqual(range(51, 60));
     expect(screen.getByText("Showing 51–60 of 60 threads")).toBeDefined();
-    expect(
-      (screen.getByRole("button", { name: "Next page" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole("button", { name: "Next page" }) as HTMLButtonElement).disabled).toBe(true);
 
     await userEvent.click(prev);
     expect(rowNumbers(container)).toEqual(range(26, 50));
@@ -851,9 +822,7 @@ describe("WorkPage pagination", () => {
     await screen.findByRole("link", { name: /#1\b/ });
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
 
-    const numbers = [...container.querySelectorAll("tbody tr")].map(
-      (tr) => tr.querySelector("td")?.textContent,
-    );
+    const numbers = [...container.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("td")?.textContent);
     expect(numbers[0]).toBe("01");
     expect(numbers[24]).toBe("25");
     expect(screen.getByText("Showing 26–50 of 60 threads")).toBeDefined();
@@ -874,7 +843,5 @@ describe("WorkPage pagination", () => {
 });
 
 function emittedClasses(container: HTMLElement): string[] {
-  return [...container.querySelectorAll("[class]")].flatMap((element) =>
-    [...element.classList],
-  );
+  return [...container.querySelectorAll("[class]")].flatMap((element) => [...element.classList]);
 }

@@ -39,14 +39,7 @@ describe("Done (S8)", () => {
   });
 
   it("the done screen says it is installed and lists what was created", () => {
-    render(
-      <Done
-        install={install}
-        report={{ created: created() }}
-        verified={true}
-        onClose={vi.fn()}
-      />,
-    );
+    render(<Done install={install} report={{ created: created() }} verified={true} onClose={vi.fn()} />);
 
     expect(screen.getByText("✓ Installed")).toBeTruthy();
     expect(screen.getByText(/"apps" is set up for apps on https:\/\/f\.example/)).toBeTruthy();
@@ -61,12 +54,7 @@ describe("Done (S8)", () => {
     // The install is complete either way; a first event simply has not arrived yet. A warn
     // here made a successful setup read like a failure.
     const { container } = render(
-      <Done
-        install={install}
-        report={{ created: created() }}
-        verified={false}
-        onClose={vi.fn()}
-      />,
+      <Done install={install} report={{ created: created() }} verified={false} onClose={vi.fn()} />,
     );
 
     expect(container.querySelector('[data-variant="warn"]')).toBeNull();
@@ -76,14 +64,7 @@ describe("Done (S8)", () => {
   });
 
   it("a verified webhook shows the tag", () => {
-    render(
-      <Done
-        install={install}
-        report={{ created: created() }}
-        verified={true}
-        onClose={vi.fn()}
-      />,
-    );
+    render(<Done install={install} report={{ created: created() }} verified={true} onClose={vi.fn()} />);
 
     const tag = screen.getByText("✓ Webhook verified");
     expect(tag.getAttribute("data-variant")).toBe("ok");
@@ -92,14 +73,7 @@ describe("Done (S8)", () => {
   it("the org link is the org page", () => {
     // Forgejo has no org-level new-issue page; a link to one is a 404 the admin meets on the
     // screen that is supposed to send them off to try the install.
-    render(
-      <Done
-        install={install}
-        report={{ created: created() }}
-        verified={false}
-        onClose={vi.fn()}
-      />,
-    );
+    render(<Done install={install} report={{ created: created() }} verified={false} onClose={vi.fn()} />);
 
     const link = screen.getByRole("link", { name: /Open apps in Forgejo/ });
     expect(link.getAttribute("href")).toBe("https://f.example/apps");

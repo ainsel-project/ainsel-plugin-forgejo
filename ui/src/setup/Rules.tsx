@@ -11,12 +11,7 @@ interface RulesProps {
   onBack: () => void;
 }
 
-export function Rules({
-  input,
-  setInput,
-  onNext,
-  onBack,
-}: RulesProps) {
+export function Rules({ input, setInput, onNext, onBack }: RulesProps) {
   return (
     <div className="forgejo-rules" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       <FieldGrid>

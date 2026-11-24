@@ -30,7 +30,15 @@ const ACCOUNT_COLUMNS = [
     header: "Role",
     cell: (row: AccountRow) => (
       <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ width: "0.5rem", height: "0.5rem", borderRadius: "999px", background: row.color, display: "inline-block" }} />
+        <span
+          style={{
+            width: "0.5rem",
+            height: "0.5rem",
+            borderRadius: "999px",
+            background: row.color,
+            display: "inline-block",
+          }}
+        />
         {row.role}
       </span>
     ),
@@ -47,13 +55,7 @@ const ACCOUNT_COLUMNS = [
   },
 ];
 
-export function Accounts({
-  input,
-  setInput,
-  editing,
-  onNext,
-  onBack,
-}: AccountsProps) {
+export function Accounts({ input, setInput, editing, onNext, onBack }: AccountsProps) {
   const roles = ["Refiner", "Developer", "Reviewer"] as const;
   const rows: AccountRow[] = roles.map((role) => {
     const key = role.toLowerCase() as keyof typeof ROLE_COLOR;
@@ -97,11 +99,7 @@ export function Accounts({
             type="password"
             value={input.adminToken}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, adminToken: e.target.value })}
-            placeholder={
-              editing
-                ? "leave empty to keep"
-                : "Personal access token with write:admin scope"
-            }
+            placeholder={editing ? "leave empty to keep" : "Personal access token with write:admin scope"}
           />
         </Field>
       </FieldGrid>

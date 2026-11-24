@@ -184,9 +184,7 @@ function groupAgents(runs: Run[]): AgentRow[] {
     // A running run is what the agent is doing; a queued one is what it does
     // next. So a running run wins even when a queued one started earlier.
     const current =
-      owned.find((run) => run.status === STATUS_RUNNING) ??
-      owned.find((run) => run.status === STATUS_QUEUED) ??
-      null;
+      owned.find((run) => run.status === STATUS_RUNNING) ?? owned.find((run) => run.status === STATUS_QUEUED) ?? null;
     rows.push({
       agent,
       role: owned[0].role,
@@ -195,10 +193,7 @@ function groupAgents(runs: Run[]): AgentRow[] {
       durationMs: owned.reduce((total, run) => total + (run.durationMs ?? 0), 0),
     });
   }
-  rows.sort(
-    (a, b) =>
-      new Date(b.runs[0].start).getTime() - new Date(a.runs[0].start).getTime(),
-  );
+  rows.sort((a, b) => new Date(b.runs[0].start).getTime() - new Date(a.runs[0].start).getTime());
   return rows;
 }
 
@@ -282,9 +277,7 @@ function roleSplit(runs: Run[]): { role: string; ms: number }[] {
     if (run.durationMs === undefined) continue;
     byRole.set(run.role, (byRole.get(run.role) ?? 0) + run.durationMs);
   }
-  return [...byRole.entries()]
-    .map(([role, ms]) => ({ role, ms }))
-    .sort((a, b) => b.ms - a.ms);
+  return [...byRole.entries()].map(([role, ms]) => ({ role, ms })).sort((a, b) => b.ms - a.ms);
 }
 
 // subjectKind is what a run's thread is, in the words the work page uses.
@@ -304,8 +297,7 @@ function subjectLabel(run: Run): string {
 // label defaults to the thread's name; the queue passes the title alone, since
 // its own column already says what kind of thread it is.
 function ThreadLink({ run, label }: { run: Run; label?: string }) {
-  const text =
-    label ?? `${subjectLabel(run)}${run.subject.title ? ` ${run.subject.title}` : ""}`;
+  const text = label ?? `${subjectLabel(run)}${run.subject.title ? ` ${run.subject.title}` : ""}`;
   return (
     <a
       href={run.url}
@@ -361,15 +353,7 @@ function Timeline({ runs, now }: { runs: Run[]; now: number }) {
         />
       ))}
       {segments.map((segment) => (
-        <rect
-          key={segment.key}
-          x={segment.x}
-          y="3"
-          width={segment.width}
-          height="6"
-          rx="3"
-          fill={segment.fill}
-        />
+        <rect key={segment.key} x={segment.x} y="3" width={segment.width} height="6" rx="3" fill={segment.fill} />
       ))}
     </svg>
   );
@@ -422,7 +406,13 @@ function Throughput({ runs, now }: { runs: Run[]; now: number }) {
       >
         <div
           aria-hidden="true"
-          style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+          }}
         >
           <div style={{ borderTop: "1px dashed var(--rule-soft)" }} />
           <div style={{ borderTop: "1px dashed var(--rule-soft)" }} />
@@ -718,8 +708,7 @@ function queueColumns(tab: QueueTab, nowMs: number, agentName: (id: string) => s
     {
       key: "when",
       header: QUEUE_TIME_HEADER[tab],
-      cell: (run: Run) =>
-        formatRelative(tab === "finished" ? (run.end ?? run.start) : run.start, clock),
+      cell: (run: Run) => formatRelative(tab === "finished" ? (run.end ?? run.start) : run.start, clock),
     },
     {
       key: "duration",
@@ -817,26 +806,17 @@ export function LivePage() {
   const active = runs.filter(isActive);
   const running = active.filter((run) => run.status === STATUS_RUNNING);
   const queued = active.filter((run) => run.status === STATUS_QUEUED);
-  const finished = runs
-    .filter((run) => !isActive(run))
-    .sort((a, b) => endOf(b) - endOf(a));
+  const finished = runs.filter((run) => !isActive(run)).sort((a, b) => endOf(b) - endOf(a));
   const recent = finished.slice(0, RECENT_LIMIT);
-  const failures = finished.filter(
-    (run) => isFailed(run) && nowMs - endOf(run) < FAILURE_BANNER_MS,
-  );
+  const failures = finished.filter((run) => isFailed(run) && nowMs - endOf(run) < FAILURE_BANNER_MS);
   const agents = groupAgents(runs);
   const runningAgents = new Set(running.map((run) => run.agent));
-  const waitingAgents = new Set(
-    queued.map((run) => run.agent).filter((agent) => !runningAgents.has(agent)),
-  );
+  const waitingAgents = new Set(queued.map((run) => run.agent).filter((agent) => !runningAgents.has(agent)));
   const failedRuns = runs.filter(isFailed).length;
   const success = successPercent(runs);
   const spend = spendOf(runs);
   const totalMs = runs.reduce((total, run) => total + (run.durationMs ?? 0), 0);
-  const oldestQueued = queued.reduce(
-    (min, run) => Math.min(min, new Date(run.start).getTime()),
-    Infinity,
-  );
+  const oldestQueued = queued.reduce((min, run) => Math.min(min, new Date(run.start).getTime()), Infinity);
   const oldestWait = Math.floor((nowMs - oldestQueued) / 60_000);
   const queueByTab: Record<QueueTab, Run[]> = { running, queued, finished: recent };
   const queueRuns = queueByTab[queueTab];
@@ -931,8 +911,7 @@ export function LivePage() {
       key: "time",
       header: "Time",
       align: "right" as const,
-      cell: (row: AgentRow) =>
-        row.durationMs === 0 ? DASH : formatDuration(row.durationMs),
+      cell: (row: AgentRow) => (row.durationMs === 0 ? DASH : formatDuration(row.durationMs)),
     },
     {
       key: "cost",
@@ -959,8 +938,7 @@ export function LivePage() {
 
       {latestFailure && (
         <Notice variant="err">
-          <b>{plural(failures.length, "run")} failed in the last hour.</b> Latest:{" "}
-          {agentName(latestFailure.agent)} on{" "}
+          <b>{plural(failures.length, "run")} failed in the last hour.</b> Latest: {agentName(latestFailure.agent)} on{" "}
           {latestFailure.url ? <ThreadLink run={latestFailure} /> : subjectLabel(latestFailure)} (
           {latestFailure.status === STATUS_TIMEOUT ? "timed out" : "failed"}).
         </Notice>
@@ -975,27 +953,15 @@ export function LivePage() {
         <Kpi
           label="Queued runs"
           value={String(queued.length)}
-          sub={
-            queued.length === 0
-              ? "Nothing waiting"
-              : `Oldest waiting ${oldestWait < 1 ? "<1" : oldestWait}m`
-          }
+          sub={queued.length === 0 ? "Nothing waiting" : `Oldest waiting ${oldestWait < 1 ? "<1" : oldestWait}m`}
         />
         <Kpi label="Runs · 24h" value={String(runs.length)} sub={`${failedRuns} failed`} />
         <Kpi
           label="Success rate"
           value={success === null ? DASH : `${success.toFixed(1)}%`}
-          sub={
-            finished.length === 0
-              ? "No run has finished yet"
-              : `Of ${plural(finished.length, "finished run")}`
-          }
+          sub={finished.length === 0 ? "No run has finished yet" : `Of ${plural(finished.length, "finished run")}`}
         />
-        <Kpi
-          label="Agent time · 24h"
-          value={totalMs === 0 ? DASH : formatDuration(totalMs)}
-          sub="Finished runs only"
-        />
+        <Kpi label="Agent time · 24h" value={totalMs === 0 ? DASH : formatDuration(totalMs)} sub="Finished runs only" />
         <Kpi
           label="Spend · 24h"
           value={formatCost(spend.costUsd, spend.known)}
@@ -1059,9 +1025,33 @@ export function LivePage() {
             value={queueTab}
             onChange={(next: string) => setQueueTab(next as QueueTab)}
             tabs={[
-              { value: "running", label: <>Running<TabCount n={running.length} /></> },
-              { value: "queued", label: <>Queued<TabCount n={queued.length} /></> },
-              { value: "finished", label: <>Recently finished<TabCount n={recent.length} /></> },
+              {
+                value: "running",
+                label: (
+                  <>
+                    Running
+                    <TabCount n={running.length} />
+                  </>
+                ),
+              },
+              {
+                value: "queued",
+                label: (
+                  <>
+                    Queued
+                    <TabCount n={queued.length} />
+                  </>
+                ),
+              },
+              {
+                value: "finished",
+                label: (
+                  <>
+                    Recently finished
+                    <TabCount n={recent.length} />
+                  </>
+                ),
+              },
             ]}
           />
         </div>

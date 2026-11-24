@@ -40,9 +40,31 @@ const installFixture = {
   hookId: 1,
   excludeLabel: "hold-for-human",
   roles: {
-    refiner: { agentId: "a-ref", imageId: "img-ref", personaId: "p-ref", botLogin: "refiner-apps", teamId: 1, tools: ["get_issue_by_index"], turnTimeoutMs: "7200000" },
-    developer: { agentId: "a-dev", imageId: "img-dev", personaId: "p-dev", botLogin: "developer-apps", teamId: 2, tools: ["create_file", "bash"] },
-    reviewer: { agentId: "a-rev", imageId: "img-rev", personaId: "p-rev", botLogin: "reviewer-apps", teamId: 3, tools: ["submit_pull_review"] }, // no turnTimeoutMs: a row from before the option
+    refiner: {
+      agentId: "a-ref",
+      imageId: "img-ref",
+      personaId: "p-ref",
+      botLogin: "refiner-apps",
+      teamId: 1,
+      tools: ["get_issue_by_index"],
+      turnTimeoutMs: "7200000",
+    },
+    developer: {
+      agentId: "a-dev",
+      imageId: "img-dev",
+      personaId: "p-dev",
+      botLogin: "developer-apps",
+      teamId: 2,
+      tools: ["create_file", "bash"],
+    },
+    reviewer: {
+      agentId: "a-rev",
+      imageId: "img-rev",
+      personaId: "p-rev",
+      botLogin: "reviewer-apps",
+      teamId: 3,
+      tools: ["submit_pull_review"],
+    }, // no turnTimeoutMs: a row from before the option
   },
 };
 
@@ -73,10 +95,7 @@ function panelTitle(container: HTMLElement): string {
 // Click "Edit" on the one install, then click through the wizard until the screen
 // named `title` is showing. Fails loudly rather than skipping a screen the walk
 // never reached — an assertion behind `if (reached) {}` proves nothing.
-async function editAndWalkTo(
-  user: ReturnType<typeof userEvent.setup>,
-  title: string,
-): Promise<HTMLElement> {
+async function editAndWalkTo(user: ReturnType<typeof userEvent.setup>, title: string): Promise<HTMLElement> {
   const { container } = render(<SetupPage />);
   await waitFor(() => {
     expect(container.querySelector(".forgejo-edit-btn")).toBeTruthy();
@@ -130,9 +149,7 @@ describe("Edit Install (the walk from S0)", () => {
 
     const slug = container.querySelector('input[placeholder="e.g., apps"]') as HTMLInputElement;
     const baseUrl = selectsIn(container)[1] as HTMLSelectElement;
-    const org = container.querySelector(
-      'input[placeholder="e.g., example-org"]',
-    ) as HTMLInputElement;
+    const org = container.querySelector('input[placeholder="e.g., example-org"]') as HTMLInputElement;
 
     expect(slug.value).toBe("apps");
     expect(baseUrl.value).toBe("https://git.example.com");
@@ -176,9 +193,7 @@ describe("Edit Install (the walk from S0)", () => {
     };
 
     await eachRolePanel(user, container, (panel, role) => {
-      const checked = Array.from(
-        panel.querySelectorAll('button.forgejo-tool-item[aria-pressed="true"]'),
-      );
+      const checked = Array.from(panel.querySelectorAll('button.forgejo-tool-item[aria-pressed="true"]'));
       // A chip's text is its state mark, then the tool name.
       const labels = checked.map((b) => (b.textContent ?? "").replace(/^[✓+⊘]/, "").trim());
       expect(labels, `${role} keeps its selection`).toContain(expectedTool[role]);
@@ -294,9 +309,7 @@ describe("Edit Install (the walk from S0)", () => {
     const user = userEvent.setup();
     const container = await editAndWalkTo(user, "Routing rules");
 
-    const label = container.querySelector(
-      'input[placeholder="do-not-refine"]',
-    ) as HTMLInputElement;
+    const label = container.querySelector('input[placeholder="do-not-refine"]') as HTMLInputElement;
     // "hold-for-human", not the wizard's default: the screen shows the install.
     expect(label.value).toBe("hold-for-human");
   });

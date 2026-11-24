@@ -75,10 +75,7 @@ const AUTH_METHOD_OPTIONS = [
 // one row by its "role.field" key — a dirty row, an older defaultVersion, and so on.
 // `extra` adds rows for fields the page has no card for, the way a newer plugin's
 // registry would answer.
-function makeSettings(
-  edits: Record<string, Partial<Setting>> = {},
-  extra: Setting[] = [],
-): Setting[] {
+function makeSettings(edits: Record<string, Partial<Setting>> = {}, extra: Setting[] = []): Setting[] {
   const rows: Setting[] = [];
   for (const role of ROLES) {
     for (const [field, value] of Object.entries(FIELD_VALUES)) {
@@ -104,9 +101,7 @@ function makeSettings(
 // carries what was saved, and a save is what makes a row dirty.
 function afterEdit(current: Setting[], role: string, field: string, value: string): Setting[] {
   return current.map((s) =>
-    s.role === role && s.field === field
-      ? { ...s, value, dirty: true, defaultVersion: RUNNING_VERSION }
-      : s,
+    s.role === role && s.field === field ? { ...s, value, dirty: true, defaultVersion: RUNNING_VERSION } : s,
   );
 }
 
@@ -116,10 +111,7 @@ function afterEdit(current: Setting[], role: string, field: string, value: strin
 const batchEdits = (body: unknown): SettingsEdit[] => (body as { settings: SettingsEdit[] }).settings;
 
 function afterBatch(current: Setting[], edits: { role: string; field: string; value?: string }[]) {
-  return edits.reduce(
-    (acc, e) => afterEdit(acc, e.role, e.field, e.value ?? ""),
-    current,
-  );
+  return edits.reduce((acc, e) => afterEdit(acc, e.role, e.field, e.value ?? ""), current);
 }
 
 function mockSettingsGet(edits: Record<string, Partial<Setting>> = {}, extra: Setting[] = []) {
@@ -186,9 +178,7 @@ describe("SettingsPage (the admin's cards)", () => {
 
     const select = screen.getByLabelText("Provider") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(
-      PROVIDER_OPTIONS.map((o) => o.value),
-    );
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(PROVIDER_OPTIONS.map((o) => o.value));
     expect(select.value).toBe("ollama-cloud");
     // The row next to it stays a free-text input: the dropdown is the answer's
     // call, not a per-field rule in the page.
@@ -202,10 +192,7 @@ describe("SettingsPage (the admin's cards)", () => {
       "refiner.llmProvider": {
         value: "legacy-cloud",
         dirty: true,
-        options: [
-          ...PROVIDER_OPTIONS,
-          { value: "legacy-cloud", label: "legacy-cloud (current, not in list)" },
-        ],
+        options: [...PROVIDER_OPTIONS, { value: "legacy-cloud", label: "legacy-cloud (current, not in list)" }],
       },
     });
     await renderLoaded();
@@ -236,9 +223,7 @@ describe("SettingsPage (the admin's cards)", () => {
 
     const select = screen.getByLabelText("OpenAI auth method") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(
-      AUTH_METHOD_OPTIONS.map((o) => o.value),
-    );
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(AUTH_METHOD_OPTIONS.map((o) => o.value));
     expect(select.value).toBe("APIKey");
   });
 
@@ -267,19 +252,18 @@ describe("SettingsPage (the admin's cards)", () => {
     mockSettingsGet();
     put.mockImplementation(async () => {
       throw httpError("bad request", {
-
         status: 400,
 
         body: {
-        fields: [
-          {
-            role: "refiner",
-            field: "llmOpenAIAuthMethod",
-            error: "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
-          },
-        ],
-      },
-
+          fields: [
+            {
+              role: "refiner",
+              field: "llmOpenAIAuthMethod",
+              error:
+                "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
+            },
+          ],
+        },
       });
     });
     await renderLoaded();
@@ -291,9 +275,7 @@ describe("SettingsPage (the admin's cards)", () => {
     fireEvent.click(within(saveBar()).getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText(/ChatGPT sign-in sends no API key/)).toBeTruthy();
-    expect((screen.getByLabelText("OpenAI auth method") as HTMLSelectElement).value).toBe(
-      "ChatGPTSignIn",
-    );
+    expect((screen.getByLabelText("OpenAI auth method") as HTMLSelectElement).value).toBe("ChatGPTSignIn");
   });
 
   it("renders the custom pair in the Model card: the URL as text, the key as a write-only password", async () => {
@@ -412,9 +394,7 @@ describe("SettingsPage (the admin's cards)", () => {
 
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
     const sent = (put.mock.calls[0][1] as { settings: SettingsEdit[] }).settings;
-    expect(sent).toEqual([
-      { role: "refiner", field: "llmCustomUrl", value: "https://new.example.com/v1" },
-    ]);
+    expect(sent).toEqual([{ role: "refiner", field: "llmCustomUrl", value: "https://new.example.com/v1" }]);
   });
 
   it("offers no reset on a key row, because there is nothing here to reset", async () => {
@@ -458,19 +438,17 @@ describe("SettingsPage (the admin's cards)", () => {
     mockSettingsGet();
     put.mockImplementation(async () => {
       throw httpError("bad request", {
-
         status: 400,
 
         body: {
-        fields: [
-          {
-            role: "refiner",
-            field: "llmProvider",
-            error: "custom provider needs a URL (set llmCustomUrl in the same save)",
-          },
-        ],
-      },
-
+          fields: [
+            {
+              role: "refiner",
+              field: "llmProvider",
+              error: "custom provider needs a URL (set llmCustomUrl in the same save)",
+            },
+          ],
+        },
       });
     });
     await renderLoaded();
@@ -494,9 +472,9 @@ describe("SettingsPage (the admin's cards)", () => {
       defaultVersion: RUNNING_VERSION,
     }));
     mockSettingsGet({}, extra);
-    put.mockImplementation(async (_path: string, body: unknown) =>
-      ({ settings: afterBatch(makeSettings({}, extra), batchEdits(body)) }),
-    );
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings({}, extra), batchEdits(body)),
+    }));
     await renderLoaded();
 
     expect(screen.getByRole("heading", { name: "Other" })).toBeTruthy();
@@ -662,16 +640,14 @@ describe("SettingsPage (batch save)", () => {
     mockSettingsGet();
     put.mockImplementation(async () => {
       throw httpError("bad request", {
-
         status: 400,
 
         body: {
-        fields: [
-          { role: "refiner", field: "llmModel", error: "model must not be empty" },
-          { role: "refiner", field: "mcpUrl", error: "not a URL" },
-        ],
-      },
-
+          fields: [
+            { role: "refiner", field: "llmModel", error: "model must not be empty" },
+            { role: "refiner", field: "mcpUrl", error: "not a URL" },
+          ],
+        },
       });
     });
     await renderLoaded();
@@ -966,9 +942,7 @@ describe("SettingsPage (Reconcile now)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
 
-    const notice = (await screen.findByText(/gone-model @spurious/)).closest(
-      '[data-testid="notice"]',
-    ) as HTMLElement;
+    const notice = (await screen.findByText(/gone-model @spurious/)).closest('[data-testid="notice"]') as HTMLElement;
     expect(notice.dataset.variant).toBe("warn");
     expect(notice.textContent).toContain("developer");
     expect(notice.textContent).toContain("unreachable");
@@ -1002,9 +976,9 @@ describe("SettingsPage (Reconcile now)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
 
-    const notice = (
-      await screen.findByText(/cannot check: the hub would not answer/)
-    ).closest('[data-testid="notice"]') as HTMLElement;
+    const notice = (await screen.findByText(/cannot check: the hub would not answer/)).closest(
+      '[data-testid="notice"]',
+    ) as HTMLElement;
     expect(notice.dataset.variant).toBe("warn");
     expect(notice.textContent).toContain("unknown");
     expect(screen.queryByText("Checked: nothing to fix.")).toBeNull();
@@ -1050,9 +1024,7 @@ describe("SettingsPage (Reconcile now)", () => {
             },
           ],
           refused: [],
-          llmChecks: [
-            { role: "reviewer", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
-          ],
+          llmChecks: [{ role: "reviewer", provider: "ollama-cloud", model: "llama3.3", state: "ok" }],
         };
       }
       throw new Error(`unexpected POST ${path}`);
@@ -1127,9 +1099,7 @@ describe("SettingsPage (access)", () => {
   it("says only admins when the GET says only admins", async () => {
     get.mockImplementation(async () => {
       throw httpError("forbidden", {
-
         status: 403,
-
       });
     });
     render(<SettingsPage />);

@@ -31,12 +31,7 @@ function ago(ms: number): string {
   return new Date(Date.now() - ms).toISOString();
 }
 
-function subject(
-  repo: string,
-  number: number,
-  kind: string,
-  title?: string,
-): Subject {
+function subject(repo: string, number: number, kind: string, title?: string): Subject {
   return { repo, number, kind, title };
 }
 
@@ -77,10 +72,7 @@ function answers(runs: Run[], prs: Run[] = []): void {
           {
             repo: "owner/apps",
             url: `${BASE}/owner/apps`,
-            items:
-              prs.length > 0
-                ? [...items, makeItem(prs, { prs: [] })]
-                : items,
+            items: prs.length > 0 ? [...items, makeItem(prs, { prs: [] })] : items,
             costKnown: false,
           },
         ]
@@ -89,9 +81,7 @@ function answers(runs: Run[], prs: Run[] = []): void {
   // hub's /agents — split by path, the way the console binds the two clients.
   // With no names registered the page falls back to ids, which is what most
   // of these tests assert on.
-  get.mockImplementation(async (path: string) =>
-    path === "/agents" ? agentsBody : { repos },
-  );
+  get.mockImplementation(async (path: string) => (path === "/agents" ? agentsBody : { repos }));
 }
 
 // What the hub's /agents answers by default: nothing, so every agent keeps its
@@ -387,9 +377,7 @@ describe("LivePage", () => {
     answers([]);
     render(<LivePage />);
     await rendered();
-    expect(
-      screen.getByText("No agent activity in the last 24 hours"),
-    ).toBeDefined();
+    expect(screen.getByText("No agent activity in the last 24 hours")).toBeDefined();
     expect(screen.getByText("Nothing running.")).toBeDefined();
     fireEvent.click(queueTab(/^Queued/));
     expect(screen.getByText("Nothing queued.")).toBeDefined();
@@ -488,9 +476,7 @@ describe("LivePage", () => {
   });
 
   it("keeps the banner away when nothing failed", async () => {
-    answers([
-      makeRun("r-ok", { status: "success", end: ago(5 * 60_000), durationMs: 60_000 }),
-    ]);
+    answers([makeRun("r-ok", { status: "success", end: ago(5 * 60_000), durationMs: 60_000 })]);
     render(<LivePage />);
     await rendered();
     expect(screen.queryByRole("alert")).toBeNull();

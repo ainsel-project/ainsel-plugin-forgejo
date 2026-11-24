@@ -59,9 +59,7 @@ function urlOf(row: HTMLElement) {
 // rowButton finds a button inside one instance row: every row carries the same
 // buttons, so a name alone is not enough.
 function rowButton(row: HTMLElement, name: string): HTMLButtonElement {
-  const btn = Array.from(row.querySelectorAll("button")).find((b) =>
-    (b.textContent ?? "").trim().startsWith(name),
-  );
+  const btn = Array.from(row.querySelectorAll("button")).find((b) => (b.textContent ?? "").trim().startsWith(name));
   if (!btn) throw new Error(`no "${name}" button in the row`);
   return btn as HTMLButtonElement;
 }
@@ -163,15 +161,13 @@ describe("SettingsPage — Forgejo instances", () => {
     mockReads([{ name: "Primary", baseUrl: "https://a.example.com" }]);
     put.mockImplementation(async () => {
       throw httpError("invalid instances", {
-
         body: {
-        error: "invalid instances",
-        fields: [
-          { role: "", field: "instances[0].name", error: "instance name is required" },
-          { role: "", field: "instances[0].baseUrl", error: "not an absolute http(s) address" },
-        ],
-      },
-
+          error: "invalid instances",
+          fields: [
+            { role: "", field: "instances[0].name", error: "instance name is required" },
+            { role: "", field: "instances[0].baseUrl", error: "not an absolute http(s) address" },
+          ],
+        },
       });
     });
 

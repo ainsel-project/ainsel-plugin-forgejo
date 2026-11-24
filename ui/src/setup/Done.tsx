@@ -77,19 +77,29 @@ export function Done({ install, report, verified, onClose }: DoneProps) {
           <Tag variant="ok">✓ Webhook verified</Tag>
         ) : (
           <Notice variant="info">
-            The webhook is set up. It is marked verified when the first event arrives: open an
-            issue, or comment on one, in any repository of {install.org}.
+            The webhook is set up. It is marked verified when the first event arrives: open an issue, or comment on one,
+            in any repository of {install.org}.
           </Notice>
         )}
 
         <div className="forgejo-next-steps" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <h5 style={{ margin: 0, fontSize: "0.8125rem", fontWeight: 600, color: "var(--ink-2)" }}>Next steps</h5>
-          <ol style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--ink-2)", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+          <ol
+            style={{
+              margin: 0,
+              paddingLeft: "1.25rem",
+              fontSize: "0.875rem",
+              color: "var(--ink-2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.375rem",
+            }}
+          >
             <li>
               <a href={orgUrl} target="_blank" rel="noopener noreferrer">
                 Open {install.org} in Forgejo
-              </a>
-              {" "}and open an issue, or comment on one, to see the agents respond.
+              </a>{" "}
+              and open an issue, or comment on one, to see the agents respond.
             </li>
             <li>Check the AInsel dashboard for the agents&apos; responses.</li>
             <li>Close this screen to return to the installs list, where you can edit the install.</li>

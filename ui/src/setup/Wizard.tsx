@@ -100,7 +100,16 @@ export function WizardPanel({ step, title, completed, onPick, onCancel, children
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "flex-start" }}>
         <ol
           aria-label="Setup steps"
-          style={{ listStyle: "none", margin: 0, padding: 0, flex: "1 1 200px", maxWidth: "16rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            flex: "1 1 200px",
+            maxWidth: "16rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.25rem",
+          }}
         >
           {WIZARD_STEPS.map((s, index) => {
             const done = index < completed;

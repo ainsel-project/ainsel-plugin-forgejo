@@ -22,15 +22,19 @@
  * to the server's value. The answer's `dirty` flag is what this page calls "stale":
  * the install has moved away from the role default, and the row says so.
  *
- * Two kinds of field are not plain text, and neither is edited by a box alone.
- * An enum is a select over the values the registry lists — the page never types a
- * model name by hand, because a typo at the top of a cascade is a fleet of agents
- * that fail hours later. An "Update available" field is an offer: the registry knows
- * the newest value in its model catalog and which are stable, and the row puts the
- * current value, the newest, and the stable list on screen together — because the
- * honest question is never only "is there something newer?" but "is the newer thing
- * one the project actually recommends?". Confirming an update sets exactly that
- * value; it is a choice the page makes visible, not a default it applies.
+ * Two kinds of row is not a plain text box, and the dropdown is the answer's
+ * doing, never this file's: a row renders as a select only when its answer
+ * carries `options` — the auth method does, the model id does not — so every
+ * other value, model names included, is typed by hand: a password box for the
+ * key rows, a textarea where the spec marks the value multiline, and a
+ * placeholder nudging the identifier's shape everywhere else. An "Update
+ * available" field is a compare-and-adopt offer and nothing more: the edit was
+ * made against an older shipped default while the running plugin ships a newer
+ * one, so the row offers a comparison — your value beside the `Default in
+ * v<running>` — and one action, "Adopt new default", which replaces the edit
+ * with the default the running version ships. There is no model catalog and no
+ * stable list in this flow; the only value an update can install is the one the
+ * running plugin already ships.
  *
  * A row whose default is empty is not a field that wants filling in. Every role
  * default here is a fallback, and the role can reach a value by another route: the
@@ -39,9 +43,7 @@
  * install, not about the field — and this page cannot see the installs. It is the
  * pass that runs there, against each one, that names a field it could not resolve.
  * So a blank default here stays blank, and says what blank means, rather than being
- * filled with a value the page has no way to justify. The plugin's own model is the
- * one field where that argument does not hold, because that value is a constant this
- * plugin ships — and its row says which of the two cases it is in.
+ * filled with a value the page has no way to justify.
  *
  * The pieces live under ./settings: ./model for the registry's cards and the shared
  * styles, one hook per collection the page writes to, and the components the page
@@ -152,7 +154,19 @@ export function SettingsPage() {
               setComparing={draftState.setComparing}
             />
           ) : pane === "instances" ? (
-            <InstancesPanel {...instanceState} />
+            <InstancesPanel
+              instances={instanceState.instances}
+              draftInstances={instanceState.draftInstances}
+              instancePending={instanceState.instancePending}
+              instanceErrors={instanceState.instanceErrors}
+              instanceError={instanceState.instanceError}
+              instanceSaving={instanceState.instanceSaving}
+              editInstance={instanceState.editInstance}
+              addInstance={instanceState.addInstance}
+              removeInstance={instanceState.removeInstance}
+              saveInstances={instanceState.saveInstances}
+              discardInstances={instanceState.discardInstances}
+            />
           ) : (
             <ManagedResources version={version} />
           )}

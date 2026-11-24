@@ -6,9 +6,10 @@ name: CodeQL
 # Runs on pushes to main, on pulls that target main, and weekly — the same
 # three-time pattern as the scheduled CI mirror, offset to a different minute.
 #
-# build-mode: none for both languages: Go is analysed without compiling, and
-# the TypeScript here needs no emit to be queried, so the job never needs a
-# toolchain step with secrets within reach.
+# Build modes: TypeScript analyses without an emit (none is CodeQL's default
+# for it), but Go has no none mode in codeql-action v4.39.4 — init fails with
+# "Go does not support the none build mode" — so Go takes autobuild with a
+# pinned setup-go step that maps no secrets into the job.
 
 on:
   push:
@@ -38,14 +39,20 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
+      # Go's autobuild compiles the repo, so the job needs a Go toolchain;
+      # the same pinned setup-go as ci.yml, and no secret is referenced.
+      - name: Set up Go (Go autobuild)
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           languages: ${{ matrix.language }}
-          # CodeQL's default build-mode for Go is autobuild, which compiles the
-          # repo — the toolchain exposure the header above rules out. none is
-          # this file's contract for both languages (already JS/TS's default).
-          build-mode: none
+          # build-mode deliberately not set: autobuild (Go's default) and none
+          # (JS/TS's default) are what the header promises. Flip Go to none if
+          # a future codeql-action release supports it.
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4

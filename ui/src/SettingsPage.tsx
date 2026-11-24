@@ -30,8 +30,9 @@
 // plugin upgrade, nothing else.
 import { Button, Input, Notice, Panel, RegisterTable, Select, Tag, Textarea, usePluginContext } from "@ainsel/plugin-sdk";
 import { useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
 import {
+  asApiError,
   fetchSettings,
   putSettings,
   reconcileSettings,
@@ -40,10 +41,9 @@ import {
 } from "./api";
 import type { ReconcileSummary, Setting, SettingsEdit, ForgejoInstance } from "./api";
 
-// The roles the registry answers for, in its order. The side navigation offers
-// them one at a time, each with its own cards.
-const ROLE_KEYS = ["refiner", "developer", "reviewer"] as const;
-type RoleKey = (typeof ROLE_KEYS)[number];
+// The roles the registry answers for. The side navigation offers them one at a
+// time, each with its own cards; the ROLES list below carries their order.
+type RoleKey = "refiner" | "developer" | "reviewer";
 
 // The copy and colour per role. The colours are the ones LivePage draws the
 // role dots with — the same token, so a console theme that re-points one role
@@ -371,11 +371,12 @@ export function SettingsPage() {
         const res = await fetchSettings(api);
         setSettings(res.settings ?? []);
         setLoading(false);
-      } catch (err: any) {
-        if (err.status === 401 || err.status === 403) {
+      } catch (err) {
+        const apiErr = asApiError(err);
+        if (apiErr.status === 401 || apiErr.status === 403) {
           setError("Only admins can access the settings.");
         } else {
-          setError(err.message || "Failed to load settings.");
+          setError(apiErr.message || "Failed to load settings.");
         }
         setLoading(false);
       }
@@ -440,11 +441,11 @@ export function SettingsPage() {
         }
         setFieldErrors(next);
       }
-    } catch (err: any) {
+    } catch (err) {
       // A refused batch is answered with each bad field named (the PUT either
       // lands whole or not at all); the console's client puts the parsed body
-      // on `err.body`. The drafts stay exactly where they were.
-      const fields: unknown = err.body?.fields;
+      // on the error's `body`. The drafts stay exactly where they were.
+      const fields: unknown = asApiError(err).body?.fields;
       if (Array.isArray(fields) && fields.length > 0) {
         const next: Record<string, string> = {};
         for (const f of fields) {
@@ -455,7 +456,7 @@ export function SettingsPage() {
         }
         setFieldErrors(next);
       } else {
-        setBatchError(err.message || "Failed to save.");
+        setBatchError(asApiError(err).message || "Failed to save.");
       }
     } finally {
       setSaving(false);
@@ -480,8 +481,9 @@ export function SettingsPage() {
       setDrafts((d) => without(d, k));
       setFieldErrors((e) => without(e, k));
       setComparing((c) => without(c, k));
-    } catch (err: any) {
-      setFieldErrors((e) => ({ ...e, [k]: err.message || "Failed to reset." }));
+    } catch (err) {
+      const message = asApiError(err).message;
+      setFieldErrors((e) => ({ ...e, [k]: message || "Failed to reset." }));
     } finally {
       setBusyKey(null);
     }
@@ -506,8 +508,8 @@ export function SettingsPage() {
         refused: next.refused.length,
         llmFlagged: next.llmChecks.filter((c) => c.state !== "ok").length,
       });
-    } catch (err: any) {
-      setReconcileError(err.message || "Failed to reconcile.");
+    } catch (err) {
+      setReconcileError(asApiError(err).message || "Failed to reconcile.");
     } finally {
       setReconciling(false);
     }
@@ -548,10 +550,10 @@ export function SettingsPage() {
       setInstances(stored);
       setInstanceDraft(null);
       setInstanceErrors({});
-    } catch (err: any) {
+    } catch (err) {
       // A refused list names each bad row, the way a refused batch names each bad
       // field. The draft stays where the admin left it, and each row says why.
-      const fields: unknown = err.body?.fields;
+      const fields: unknown = asApiError(err).body?.fields;
       if (Array.isArray(fields) && fields.length > 0) {
         const next: Record<string, string> = {};
         for (const f of fields) {
@@ -567,7 +569,7 @@ export function SettingsPage() {
         }
         setInstanceErrors(next);
       } else {
-        setInstanceError(err.message || "Failed to save the instances.");
+        setInstanceError(asApiError(err).message || "Failed to save the instances.");
       }
     } finally {
       setInstanceSaving(false);
@@ -636,7 +638,7 @@ export function SettingsPage() {
         <Textarea
           id={id}
           value={value}
-          onChange={(e: any) => edit(s, e.target.value)}
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => edit(s, e.target.value)}
           placeholder={spec.placeholder}
           className={spec.mono ? "forgejo-settings-mono" : undefined}
         />
@@ -645,7 +647,7 @@ export function SettingsPage() {
           id={id}
           type={spec.secret ? "password" : "text"}
           value={value}
-          onChange={(e: any) => edit(s, e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => edit(s, e.target.value)}
           placeholder={spec.placeholder}
           className={spec.mono ? "forgejo-settings-mono" : undefined}
         />
@@ -927,14 +929,14 @@ export function SettingsPage() {
             <Input
               aria-label={`Instance ${i + 1} name`}
               value={inst.name}
-              onChange={(e: any) => editInstance(i, { name: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => editInstance(i, { name: e.target.value })}
               placeholder="e.g., Primary"
             />
             <Input
               aria-label={`Instance ${i + 1} base URL`}
               className="forgejo-settings-mono"
               value={inst.baseUrl}
-              onChange={(e: any) => editInstance(i, { baseUrl: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => editInstance(i, { baseUrl: e.target.value })}
               placeholder="https://forgejo.example.com"
             />
             {instanceErrors[`instances[${i}]`] && (

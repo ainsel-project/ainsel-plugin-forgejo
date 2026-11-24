@@ -1,3 +1,4 @@
+import type { ChangeEvent } from "react";
 import { Button, Field, Input, Notice, Select } from "@ainsel/plugin-sdk";
 import type { ForgejoInstance } from "../api";
 import type { Input as InputType } from "./model";
@@ -99,7 +100,7 @@ export function Instance({
           <Input
             id="instance-slug"
             value={input.slug}
-            onChange={(e: any) => setInput({ ...input, slug: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, slug: e.target.value })}
             placeholder="e.g., apps"
           />
         </Field>
@@ -148,7 +149,7 @@ export function Instance({
           <Input
             id="instance-org"
             value={input.org}
-            onChange={(e: any) => setInput({ ...input, org: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, org: e.target.value })}
             placeholder="e.g., example-org"
           />
         </Field>

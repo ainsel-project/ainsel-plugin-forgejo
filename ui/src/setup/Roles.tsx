@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
 import { Button, Field, Input, Notice } from "@ainsel/plugin-sdk";
 import type { RoleToolSets } from "../api";
 import type { Input as InputType, RoleInput, WorkingHours } from "./model";
@@ -301,7 +301,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             <Input
               id={`roles-${role}-agent-name`}
               value={roleData.agentName}
-              onChange={(e: any) => handleRoleChange(role, { agentName: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { agentName: e.target.value })}
               placeholder={`forgejo-${role}-${input.slug}`}
             />
           </Field>
@@ -326,7 +326,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             <Input
               id={`roles-${role}-runtime`}
               value={roleData.runtime}
-              onChange={(e: any) => handleRoleChange(role, { runtime: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { runtime: e.target.value })}
               placeholder="registry.example.com/image:tag"
             />
           </Field>
@@ -348,7 +348,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             <Input
               id={`roles-${role}-turn-timeout`}
               value={turnTimeoutMinutesFromMs(roleData.turnTimeoutMs)}
-              onChange={(e: any) =>
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 handleRoleChange(role, { turnTimeoutMs: turnTimeoutMsFromMinutes(e.target.value) })
               }
               placeholder={turnTimeoutMinutesFromMs(TURN_TIMEOUT_DEFAULT_MS[role])}
@@ -370,7 +370,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               id={`roles-${role}-llm-key`}
               type="password"
               value={roleData.llmKey ?? ""}
-              onChange={(e: any) => handleRoleChange(role, { llmKey: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { llmKey: e.target.value })}
               placeholder="(unchanged)"
             />
           </Field>
@@ -395,7 +395,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               className="forgejo-hours-on"
               type="checkbox"
               checked={roleData.workingHours !== undefined}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 handleRoleChange(role, {
                   workingHours: e.target.checked ? newWorkingHours() : undefined,
                 })
@@ -438,7 +438,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                     id={`roles-${role}-hours-start`}
                     type="time"
                     value={roleData.workingHours.start}
-                    onChange={(e: any) => handleHoursField(role, { start: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleHoursField(role, { start: e.target.value })}
                     placeholder="09:00"
                   />
                 </Field>
@@ -451,7 +451,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                     id={`roles-${role}-hours-end`}
                     type="time"
                     value={roleData.workingHours.end}
-                    onChange={(e: any) => handleHoursField(role, { end: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleHoursField(role, { end: e.target.value })}
                     placeholder="17:00"
                   />
                 </Field>
@@ -463,7 +463,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                   <Input
                     id={`roles-${role}-hours-tz`}
                     value={roleData.workingHours.timezone}
-                    onChange={(e: any) => handleHoursField(role, { timezone: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleHoursField(role, { timezone: e.target.value })}
                     placeholder="UTC"
                   />
                 </Field>

@@ -7,6 +7,8 @@ import userEvent from "@testing-library/user-event";
 import { SetupPage } from "./SetupPage";
 import { get, post } from "../testing/sdk";
 import { assertEveryLabelPointsAtItsControl } from "../testing/dom";
+import { httpError } from "../testing/errors";
+import type { Input } from "./model";
 import type { ApplyResponse, PlanResponse, RoleState, SetupOptions } from "../api";
 
 const optionsFixture: SetupOptions = {
@@ -360,17 +362,20 @@ describe("SetupPage (the wizard router)", () => {
       if (path === "/setup/apply") {
         // The shape the console's request() throws for a 502 whose body is
         // { error, report } (frontend/src/api/client.ts).
-        const err: any = new Error("CreateUser: user already exists");
-        err.status = 502;
-        err.body = {
+        throw httpError("CreateUser: user already exists", {
+
+          status: 502,
+
+          body: {
           error: "CreateUser: user already exists",
           report: {
             created: [],
             rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
             leftovers: [],
           },
-        };
-        throw err;
+        },
+
+        });
       }
       throw new Error(`unexpected POST ${path}`);
     });
@@ -453,13 +458,13 @@ describe("SetupPage (the wizard router)", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByRole("button", { name: /^Apply/ });
 
-    const planned = post.mock.calls.find((c) => c[0] === "/setup/plan")?.[1] as any;
+    const planned = post.mock.calls.find((c) => c[0] === "/setup/plan")?.[1] as Input;
     expect(planned.roles.refiner.llmKey).toBe("sk-walk");
 
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
     await screen.findByText("Verify the connection");
 
-    const applied = post.mock.calls.find((c) => c[0] === "/setup/apply")?.[1] as any;
+    const applied = post.mock.calls.find((c) => c[0] === "/setup/apply")?.[1] as Input;
     expect(applied.roles.refiner.llmKey).toBe("sk-walk");
   });
 
@@ -502,7 +507,7 @@ describe("SetupPage (the wizard router)", () => {
       await user.click(screen.getByRole("button", { name: "Continue" }));
     }
     const plans = post.mock.calls.filter((call) => call[0] === "/setup/plan");
-    const last = plans[plans.length - 1][1] as any;
+    const last = plans[plans.length - 1][1] as Input;
     expect(last.adminToken).toBe("");
   });
 
@@ -520,17 +525,20 @@ describe("SetupPage (the wizard router)", () => {
     post.mockImplementation(async (path: string) => {
       if (path === "/setup/plan") return planFixture;
       if (path === "/setup/apply") {
-        const err: any = new Error("CreateUser: user already exists");
-        err.status = 502;
-        err.body = {
+        throw httpError("CreateUser: user already exists", {
+
+          status: 502,
+
+          body: {
           error: "CreateUser: user already exists",
           report: {
             created: [],
             rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
             leftovers: [],
           },
-        };
-        throw err;
+        },
+
+        });
       }
       throw new Error(`unexpected POST ${path}`);
     });
@@ -798,7 +806,7 @@ describe("the edit walk's working hours", () => {
     await screen.findByRole("button", { name: /^Apply/ });
 
     const plans = post.mock.calls.filter((call) => call[0] === "/setup/plan");
-    const body = plans[plans.length - 1][1] as any;
+    const body = plans[plans.length - 1][1] as Input;
     expect(body.roles.developer.workingHours).toEqual(hoursWindow);
     expect(body.roles.refiner.workingHours).toBeUndefined();
   });

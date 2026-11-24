@@ -810,6 +810,7 @@ export function LivePage() {
   // Every figure on the board is measured from the same moment: the fetch that
   // produced the runs. Measuring from the render instead would let a slow render
   // age a timeline's runs against a clock the data never saw.
+  // eslint-disable-next-line react-hooks/purity -- unreachable fallback: every path that sets `runs` also sets `updatedAt`, so the impure read never answers.
   const nowMs = updatedAt ?? Date.now();
   const clock = new Date(nowMs);
   const active = runs.filter(isActive);

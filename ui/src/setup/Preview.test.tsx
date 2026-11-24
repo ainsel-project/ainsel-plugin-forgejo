@@ -9,7 +9,7 @@ const planOf = (
     create: { kind: string; name: string; detail: string }[];
     change: { kind: string; name: string; detail: string }[];
     delete: { kind: string; name: string; detail: string }[];
-    triggers: { name: string; agentRef: string; connectorRef: string; filters: any[] }[];
+    triggers: { name: string; agentRef: string; connectorRef: string; filters: unknown[] }[];
     blocking: string[];
     warnings: string[];
   }>,

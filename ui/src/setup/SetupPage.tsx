@@ -12,6 +12,7 @@ import { Preview, triggerRole } from "./Preview";
 import { Connect } from "./Connect";
 import { Done } from "./Done";
 import { WIZARD_STEPS, WizardPanel } from "./Wizard";
+import { asApiError } from "../api";
 import type { SetupOptions, PlanResponse, ApplyResponse, ApplyReport, Install, RemoveResponse } from "../api";
 
 export function SetupPage() {
@@ -91,11 +92,12 @@ export function SetupPage() {
         setInstalls(instList.installs);
         setCurrentStep("installs");
         setLoading(false);
-      } catch (err: any) {
-        if (err.status === 401 || err.status === 403) {
+      } catch (err) {
+        const apiErr = asApiError(err);
+        if (apiErr.status === 401 || apiErr.status === 403) {
           setError("Only admins can access the setup wizard.");
         } else {
-          setError(err.message || "Failed to load setup wizard.");
+          setError(apiErr.message || "Failed to load setup wizard.");
         }
         setLoading(false);
       }
@@ -216,10 +218,10 @@ export function SetupPage() {
       // Reload installs
       const instList = (await api.get("/setup/installs")) as { installs: Install[] };
       setInstalls(instList.installs);
-    } catch (err: any) {
+    } catch (err) {
       // The list is where the admin was standing and where they will want to try again, so the
       // failure is the list's to show — not a full screen with no way out of it.
-      setStepError(err.message || "Failed to remove install.");
+      setStepError(asApiError(err).message || "Failed to remove install.");
     }
   };
 
@@ -255,11 +257,11 @@ export function SetupPage() {
         })) as PlanResponse;
         setPlan(response);
         setCurrentStep(next);
-      } catch (err: any) {
+      } catch (err) {
         // Stay on the step that asked: the plan's own message goes above the screen the admin
         // can still correct, and Next asks again. Taking the screen away would end a walk that
         // has done nothing wrong.
-        setStepError(err.message || "Failed to plan install.");
+        setStepError(asApiError(err).message || "Failed to plan install.");
       }
     } else if (next) {
       setCurrentStep(next);
@@ -309,12 +311,13 @@ export function SetupPage() {
       // Reload installs
       const instList = (await api.get("/setup/installs")) as { installs: Install[] };
       setInstalls(instList.installs);
-    } catch (err: any) {
+    } catch (err) {
+      const apiErr = asApiError(err);
       // A 502 from Apply carries the hub's or Forgejo's own message and the
       // report of what was created, rolled back and left behind (spec §5[8]).
       // The console's request() puts the parsed body on `body`.
-      setApplyError(err.message || "Failed to apply install.");
-      const report = err.body?.report ?? err.report;
+      setApplyError(apiErr.message || "Failed to apply install.");
+      const report = (apiErr.body?.report ?? apiErr.report) as ApplyReport | undefined;
       setApplyReport(report ?? null);
     } finally {
       applyingRef.current = false;

@@ -2,6 +2,7 @@ import { Button, Notice } from "@ainsel/plugin-sdk";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { usePluginContext } from "@ainsel/plugin-sdk";
+import { asApiError } from "../api";
 import { StepFooter } from "./Wizard";
 
 // How long to wait for Forgejo to deliver the test event, and how often to ask.
@@ -48,6 +49,7 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
   useEffect(() => {
     const startedAt = Date.now();
     let cancelled = false;
+    // eslint-disable-next-line prefer-const -- `let`, not `const`: the first pollDeliveries() runs before the assignment below, and its timeout path calls stop(), which reads `timer`. A const would TDZ-crash there.
     let timer: ReturnType<typeof setInterval> | undefined;
 
     const stop = () => {
@@ -79,13 +81,13 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
           setVerified(true);
           setVerificationTime(response.at);
         }
-      } catch (err: any) {
+      } catch (err) {
         // A poll that failed to answer is not an answer; the next one asks again. Three of them
         // in a row is worth the admin hearing, though — "polling" over a hub this screen cannot
         // reach is a wait that will not end on its own.
         failures += 1;
         if (failures >= 3) {
-          setPollError(err?.message || "The deliveries endpoint did not answer");
+          setPollError(asApiError(err).message || "The deliveries endpoint did not answer");
         }
       }
     };

@@ -8,6 +8,7 @@ import userEvent from "@testing-library/user-event";
 import type { RenderResult } from "@testing-library/react";
 import { SettingsPage } from "./SettingsPage";
 import { get, post, put } from "./testing/sdk";
+import { httpError } from "./testing/errors";
 import type { ForgejoInstance, Setting } from "./api";
 
 // A registry small enough to read: the page renders whatever the answer carries,
@@ -105,8 +106,8 @@ describe("SettingsPage — Forgejo instances", () => {
   it("saves the whole list in one PUT, including the row it added", async () => {
     const user = userEvent.setup();
     mockReads([{ name: "Primary", baseUrl: "https://a.example.com" }]);
-    put.mockImplementation(async (path: string, body: any) => {
-      if (path === "/instances") return { instances: body.instances };
+    put.mockImplementation(async (path: string, body: unknown) => {
+      if (path === "/instances") return { instances: (body as { instances: ForgejoInstance[] }).instances };
       throw new Error(`unexpected PUT ${path}`);
     });
 
@@ -136,8 +137,8 @@ describe("SettingsPage — Forgejo instances", () => {
       { name: "Keep", baseUrl: "https://a.example.com" },
       { name: "Drop", baseUrl: "https://b.example.com" },
     ]);
-    put.mockImplementation(async (path: string, body: any) => {
-      if (path === "/instances") return { instances: body.instances };
+    put.mockImplementation(async (path: string, body: unknown) => {
+      if (path === "/instances") return { instances: (body as { instances: ForgejoInstance[] }).instances };
       throw new Error(`unexpected PUT ${path}`);
     });
 
@@ -161,15 +162,17 @@ describe("SettingsPage — Forgejo instances", () => {
     const user = userEvent.setup();
     mockReads([{ name: "Primary", baseUrl: "https://a.example.com" }]);
     put.mockImplementation(async () => {
-      const err: any = new Error("invalid instances");
-      err.body = {
+      throw httpError("invalid instances", {
+
+        body: {
         error: "invalid instances",
         fields: [
           { role: "", field: "instances[0].name", error: "instance name is required" },
           { role: "", field: "instances[0].baseUrl", error: "not an absolute http(s) address" },
         ],
-      };
-      throw err;
+      },
+
+      });
     });
 
     const { container } = await openInstances(user);

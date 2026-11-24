@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { Installs } from "./Installs";
 import { post } from "../testing/sdk";
+import { httpError } from "../testing/errors";
+import type { Install } from "../api";
 
 describe("Installs (S0)", () => {
   afterEach(() => {
@@ -273,10 +275,12 @@ describe("Installs (S0)", () => {
     },
   };
 
-  const renderInstalls = (installs: any[]) =>
+  // Partial<Install>: each fixture spells out only the fields its assertions are
+  // about; the component reads nothing else off the rest.
+  const renderInstalls = (installs: Partial<Install>[]) =>
     render(
       <Installs
-        installs={installs}
+        installs={installs as Install[]}
         onNewInstall={vi.fn()}
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
@@ -489,9 +493,11 @@ describe("Installs (S0)", () => {
 
   it("a refused plan names the refusal and leaves no delete behind", async () => {
     post.mockImplementation(async () => {
-      const err: any = new Error("adminToken is required");
-      err.status = 400;
-      throw err;
+      throw httpError("adminToken is required", {
+
+        status: 400,
+
+      });
     });
 
     const { container } = renderSweep();

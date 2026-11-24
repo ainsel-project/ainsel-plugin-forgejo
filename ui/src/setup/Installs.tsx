@@ -1,7 +1,8 @@
 import { Button, Notice, Panel, Field, Input, Select, Tag, RegisterTable, usePluginContext } from "@ainsel/plugin-sdk";
 import { useState } from "react";
+import type { ChangeEvent } from "react";
 import type { ForgejoInstance, Group, Install, OrphanDeleteReport, OrphanPlan } from "../api";
-import { deleteOrphans, planOrphans } from "../api";
+import { asApiError, deleteOrphans, planOrphans } from "../api";
 import { formatRelative } from "../format";
 import { COVERAGE_FAMILIES, deriveResults } from "./createdKinds";
 import { ROLE_COLOR } from "./model";
@@ -202,7 +203,7 @@ function OrphanCleanup({ instances }: { instances: ForgejoInstance[] }) {
   // Any edit to what the sweep looks for invalidates the plan on screen: the delete
   // re-derives the set from the form when it runs, and a stale list above a changed
   // form would be a list of something else.
-  const edit = (setter: (v: string) => void) => (e: any) => {
+  const edit = (setter: (v: string) => void) => (e: ChangeEvent<HTMLInputElement>) => {
     setter(e.target.value);
     setPlan(null);
     setReport(null);
@@ -215,9 +216,9 @@ function OrphanCleanup({ instances }: { instances: ForgejoInstance[] }) {
     setReport(null);
     try {
       setPlan(await planOrphans(api, slug.trim(), request()));
-    } catch (err: any) {
+    } catch (err) {
       setPlan(null);
-      setError(err.message || "Failed to plan the cleanup.");
+      setError(asApiError(err).message || "Failed to plan the cleanup.");
     } finally {
       setBusy(false);
     }
@@ -230,8 +231,8 @@ function OrphanCleanup({ instances }: { instances: ForgejoInstance[] }) {
     try {
       setReport(await deleteOrphans(api, slug.trim(), request()));
       setPlan(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to run the cleanup.");
+    } catch (err) {
+      setError(asApiError(err).message || "Failed to run the cleanup.");
     } finally {
       setBusy(false);
     }
@@ -475,7 +476,7 @@ export function Installs({
                     id="installs-remove-token"
                     type="password"
                     value={removeToken}
-                    onChange={(e: any) => setRemoveToken(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setRemoveToken(e.target.value)}
                     placeholder="Admin token (optional)"
                   />
                 </Field>

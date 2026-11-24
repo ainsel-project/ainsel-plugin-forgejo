@@ -11,7 +11,9 @@ interface Trigger {
   name: string;
   agentRef: string;
   connectorRef: string;
-  filters: any[];
+  // The rule engine's filter objects: this step only counts triggers, never reads
+  // inside a filter, so the shape stays opaque here rather than being restated.
+  filters: unknown[];
 }
 
 interface Verdict {

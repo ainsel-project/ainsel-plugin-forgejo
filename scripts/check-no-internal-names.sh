@@ -24,13 +24,15 @@ for ((i = 0; i < ${#retired[@]}; i += 2)); do
   patterns+=("${retired[i]}${retired[i + 1]}")
 done
 
-# The text this repo publishes or serves: docs, the README, Go and UI sources with
-# their fixtures, the plugin content, and the scripts. git ls-files keeps tracked
-# files only, so an untracked scratch file cannot fail someone's CI. NUL-delimited
-# end to end, so a path containing a space stays one path.
-mapfile -d '' -t files < <(git ls-files -z -- \
-  'docs' 'README.md' 'content' 'ui/src' 'scripts' '.github' \
-  '*.go' '*_test.go' '*.json' '*.md' '*.yml' '*.yaml')
+# Everything the repo tracks, by default. Listing the covered paths by extension
+# (as this guard did until now) silently misses the first file type nobody thought
+# of: chart/tests/render_test.sh, a Makefile, a Dockerfile, a docs-site source.
+# With the default inverted, a new file type is covered by default rather than by
+# remembering, and the one exclusion says what genuinely is not published: the
+# design notes in docs/design/. grep below skips binary matches (-I). git ls-files
+# keeps tracked files only, so an untracked scratch file cannot fail someone's CI.
+# NUL-delimited end to end, so a path containing a space stays one path.
+mapfile -d '' -t files < <(git ls-files -z -- . ':(exclude)docs/design')
 
 # .github/CODEOWNERS is the one tracked file allowed to name a person: naming the maintainer is
 # what that file is for, and an entry that named nobody would own nothing.

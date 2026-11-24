@@ -18,6 +18,7 @@
 - [Credentials and Access](credentials)
 - [Configuration](configuration)
 - [HTTP API](api-reference)
+- [UI Layout](ui-layout)
 - [MCP Tools](mcp-tools)
 
 ## Guides

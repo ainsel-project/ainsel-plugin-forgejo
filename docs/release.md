@@ -16,6 +16,14 @@ Releases run the same way as in [ainsel-project/ainsel](https://github.com/ainse
 
 Publishing runs on the tag, never on `main`, because the tag ref is the signing identity installers trust (`release.yml@refs/tags/v…`, below). A tag the workflow token creates fires no push trigger, which is why the hand-off is an explicit dispatch — and why release-please runs with the workflow token, not a PAT: a PAT-pushed tag would also fire `release.yml`'s tag trigger and publish twice.
 
+Where the version markers live, for the CI grep guard (issue #20 follow-up): the
+`x-release-please-start-version` / `x-release-please-end` blocks sit **outside** the ```bash
+fences in `README.md`, `docs/installation.md` and `docs/quickstart.md` — one pair brackets each
+install snippet, and a pair brackets the compatibility table in `README.md` and
+`docs/installation.md`, so its `0.3.0` upper bound rides the release PR too. A copy-pasted fence
+therefore stays valid bash while the Generic updater still sees the version line inside the
+block. The guard should key on this layout and skip the generic `--version 1.2.3` example below.
+
 The `v` prefix is dropped, so the image tag, the chart version and the chart's `appVersion` all read `1.2.3`. `release.yml` refuses a dispatch on anything but a `v` tag, and a release whose `ainsel-plugin.json` does not name the tag's version — the version the hub shows and the plugin's API and MCP endpoint report.
 
 Pushing a tag by hand (`git tag vX.Y.Z && git push origin vX.Y.Z`) still runs `release.yml`, for a re-publish or an emergency; bump `ainsel-plugin.json` first or the gate stops it.

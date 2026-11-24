@@ -27,9 +27,13 @@ digest, and the signature says who built it.
 that contract's version — not the plugin's own version. Keep the plugin release
 and the hub within one another's API level.
 
+<!-- x-release-please-start-version -->
+
 | Plugin version | Plugin API (`pluginApi`) | AInsel platform |
 | --- | --- | --- |
 | 0.1.0 – 0.3.0 (every release so far) | 1.1 | a hub serving the Plugin API 1.1 contract |
+
+<!-- x-release-please-end -->
 
 A new row belongs here whenever `pluginApi` changes. The exact minimum AInsel
 release per row still needs the author's release history — `pluginApi` is what

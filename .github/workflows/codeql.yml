@@ -47,6 +47,7 @@ jobs:
       # Go's autobuild compiles the repo, so the job needs a Go toolchain;
       # the same pinned setup-go as ci.yml, and no secret is referenced.
       - name: Set up Go (Go autobuild)
+        if: matrix.language == 'go'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod

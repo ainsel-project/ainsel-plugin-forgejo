@@ -208,11 +208,3 @@ export function StepFooter({ onBack, children }: { onBack?: () => void; children
 // The monospace stack for names the admin may copy: slugs, bot logins, image references. The
 // bundle ships no stylesheet, so it is written out where it is used.
 export const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
-
-// The grid the fields of a step sit in: as many columns as fit at 260px, so a field with a
-// long help text does not squeeze its neighbour on a narrow window.
-export const FIELD_GRID_STYLE = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: "1rem 1.25rem",
-} as const;

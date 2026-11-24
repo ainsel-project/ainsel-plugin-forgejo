@@ -1,6 +1,7 @@
 import { Button, Field, Input } from "@ainsel/plugin-sdk";
 import type { Input as InputType } from "./model";
-import { FIELD_GRID_STYLE, StepFooter } from "./Wizard";
+import { StepFooter } from "./Wizard";
+import { FieldGrid } from "../layout";
 
 interface RulesProps {
   input: InputType;
@@ -17,7 +18,7 @@ export function Rules({
 }: RulesProps) {
   return (
     <div className="forgejo-rules" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-      <div style={FIELD_GRID_STYLE}>
+      <FieldGrid>
         <Field
           htmlFor="rules-exclude-label"
           label="Exclude label"
@@ -30,7 +31,7 @@ export function Rules({
             placeholder="do-not-refine"
           />
         </Field>
-      </div>
+      </FieldGrid>
 
       <StepFooter onBack={onBack}>
         <Button variant="primary" onClick={onNext} className="forgejo-next-btn">

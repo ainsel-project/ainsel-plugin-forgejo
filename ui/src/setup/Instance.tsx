@@ -1,7 +1,8 @@
 import { Button, Field, Input, Notice, Select } from "@ainsel/plugin-sdk";
 import type { ForgejoInstance } from "../api";
 import type { Input as InputType } from "./model";
-import { FIELD_GRID_STYLE, StepFooter } from "./Wizard";
+import { StepFooter } from "./Wizard";
+import { FieldGrid } from "../layout";
 
 interface Group {
   id: string;
@@ -90,7 +91,7 @@ export function Instance({
         </Notice>
       )}
 
-      <div style={FIELD_GRID_STYLE}>
+      <FieldGrid>
         <Field
           htmlFor="instance-slug"
           label="Install name"
@@ -152,7 +153,7 @@ export function Instance({
             placeholder="e.g., example-org"
           />
         </Field>
-      </div>
+      </FieldGrid>
 
       <StepFooter onBack={onBack}>
         {!isGroupBlocked && canContinue && (

@@ -34,8 +34,10 @@ Two more facts worth having in hand:
 
 - **The install row holds no secret** — ids, logins, labels, tool sets, timestamps.
 - **The SQLite file under `/data` holds settings and nothing else.** An older version kept
-  a provider key there; on startup such a row is forwarded to the role's agents and
-  deleted, so a current install's file carries no secret at all.
+  a provider key there; on startup such a row is forwarded to the role's agents and deleted.
+  The one exception: a row the hub refused stays for the next start, because until the key
+  lands the row is the only copy there is. A current install's file therefore carries no
+  secret once every stored key has landed.
 
 Nothing here is claimed to be encrypted at rest or rotated automatically: this plugin
 neither does nor promises either.

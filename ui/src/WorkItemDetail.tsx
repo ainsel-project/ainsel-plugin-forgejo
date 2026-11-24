@@ -1,4 +1,5 @@
 import { Panel, Tag } from "@ainsel/plugin-sdk";
+import { CardGrid } from "./layout";
 import type { ReactNode } from "react";
 import type { Item, Run } from "./api";
 import {
@@ -132,14 +133,12 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
         </div>
       </div>
 
-      <div
+      <CardGrid
         className="forgejo-detail-cards"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 8,
-          padding: "16px 20px",
-        }}
+        minTrackWidth={200}
+        maxColumns={4}
+        gap={8}
+        style={{ padding: "16px 20px" }}
       >
         <Card label="Cost" value={formatCost(totals.costUsd, totals.costKnown)} />
         <Card label="Agent time" value={formatDuration(totals.durationMs)} />
@@ -159,7 +158,7 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
             </span>
           }
         />
-      </div>
+      </CardGrid>
 
       {item.prs.length > 0 && (
         // The cards add the thread up, so this line keeps the split readable: the issue's own

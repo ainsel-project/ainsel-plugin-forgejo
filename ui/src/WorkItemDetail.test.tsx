@@ -224,14 +224,16 @@ describe("WorkItemDetail", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("emits only classes prefixed with forgejo-", async () => {
+// The shared layout module (ui/src/layout.tsx) contributes its own `ainsel-` classes;
+// everything else the page emits stays a `forgejo-*` theme hook.
+  it("emits only classes prefixed with forgejo- or the shared ainsel-", async () => {
     const { container } = renderDetail();
     await screen.findByRole("heading", { name: "Add the widget" });
 
     for (const cls of [...container.querySelectorAll("[class]")].flatMap((el) =>
       [...el.classList],
     )) {
-      expect(cls.startsWith("forgejo-")).toBe(true);
+      expect(cls.startsWith("forgejo-") || cls.startsWith("ainsel-")).toBe(true);
     }
   });
 });

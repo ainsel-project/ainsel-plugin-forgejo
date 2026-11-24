@@ -453,7 +453,7 @@ describe("WorkPage", () => {
     expect(anchor.getAttribute("target")).toBe("_blank");
   });
 
-  it("emits only classes prefixed with forgejo-", async () => {
+  it("emits only classes prefixed with forgejo- or the shared ainsel-", async () => {
     answers(TWO_REPOS);
 
     const { container } = render(<WorkPage />);
@@ -462,7 +462,7 @@ describe("WorkPage", () => {
     const emitted = emittedClasses(container);
     expect(emitted.length).toBeGreaterThan(0);
     for (const cls of emitted) {
-      expect(cls.startsWith("forgejo-")).toBe(true);
+      expect(cls.startsWith("forgejo-") || cls.startsWith("ainsel-")).toBe(true);
     }
   });
 });
@@ -859,7 +859,7 @@ describe("WorkPage pagination", () => {
     expect(screen.getByText("Showing 26–50 of 60 threads")).toBeDefined();
   });
 
-  it("emits only classes prefixed with forgejo- when the pager is showing", async () => {
+  it("emits only classes prefixed with forgejo- or the shared ainsel- when the pager is showing", async () => {
     answers(oneRepo(60));
 
     const { container } = render(<WorkPage />);
@@ -868,7 +868,7 @@ describe("WorkPage pagination", () => {
     const emitted = emittedClasses(container);
     expect(emitted.length).toBeGreaterThan(0);
     for (const cls of emitted) {
-      expect(cls.startsWith("forgejo-")).toBe(true);
+      expect(cls.startsWith("forgejo-") || cls.startsWith("ainsel-")).toBe(true);
     }
   });
 });

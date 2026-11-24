@@ -205,6 +205,16 @@ describe("CardGrid", () => {
 // ui/src may hand its column count back to `auto-fit`, whose shifting columns this whole change
 // retires.
 describe("no auto-fit remains", () => {
+  // Built, not literal: this file must not flag itself.
+  const needle = "repeat(" + "auto-fit";
+
+  // The guard dies silently if the needle ever stops matching anything — a typo in either
+  // half makes the walk below pass unconditionally. So prove the needle bites a known-bad
+  // grid (assembled the same way, so this file still carries no literal) before trusting it.
+  it("the needle matches an auto-fit grid", () => {
+    expect("repeat(" + "auto-fit, minmax(220px, 1fr))").toContain(needle);
+  });
+
   it("refuses an auto-fit grid in any source file", () => {
     // vitest runs with ui/ as cwd; fall back to the repo root if the runner started there.
     const src = existsSync(join(process.cwd(), "src"))
@@ -217,7 +227,6 @@ describe("no auto-fit remains", () => {
         if (entry.isDirectory()) walk(path);
         else if (/\.(ts|tsx|css)$/.test(entry.name)) {
           const text = readFileSync(path, "utf8");
-          const needle = "repeat(" + "(auto-fit"; // built, not literal: this file must not flag itself
           if (text.includes(needle)) offenders.push(path);
         }
       }

@@ -12,13 +12,15 @@ Forgejo — the wizard creates the bot accounts with it.
 Helm releases are at `oci://ghcr.io/ainsel-project/charts/forgejo`. The chart
 refuses to render without an image digest, because AInsel pins a plugin by digest:
 
+<!-- x-release-please-start-version -->
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  --version 0.1.0 \
+  --version 0.3.0 \
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:… \
   --set forgejo.baseURL=https://forgejo.example.com
 ```
+<!-- x-release-please-end -->
 
 The digest of a release is printed in that release's workflow job summary.
 Releases are signed keyless; the trust config that accepts them lives in AInsel's

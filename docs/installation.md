@@ -21,16 +21,36 @@ digest, and the signature says who built it.
   ingress-only and AInsel restricts no egress, so this works by default; a cluster
   with default-deny egress needs a rule for it.
 
+## Compatibility
+
+`ainsel-plugin.json` is the contract with the hub, and its `pluginApi` field is
+that contract's version — not the plugin's own version. Keep the plugin release
+and the hub within one another's API level.
+
+<!-- x-release-please-start-version -->
+
+| Plugin version | Plugin API (`pluginApi`) | AInsel platform |
+| --- | --- | --- |
+| 0.1.0 – 0.3.0 (every release so far) | 1.1 | a hub serving the Plugin API 1.1 contract |
+
+<!-- x-release-please-end -->
+
+A new row belongs here whenever `pluginApi` changes. The exact minimum AInsel
+release per row still needs the author's release history — `pluginApi` is what
+the hub negotiates, so the contract column cannot drift from the code.
+
 ## Install with Helm
 
+<!-- x-release-please-start-version -->
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  --version 0.1.0 \
+  --version 0.3.0 \
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:… \
   --set forgejo.baseURL=https://forgejo.example.com \
   --set plugin.groupAccess[0]=<group-id>
 ```
+<!-- x-release-please-end -->
 
 The chart renders four things: the Deployment and its Service, the PVC the install
 store lives on, a NetworkPolicy admitting only AInsel's own pods, and the

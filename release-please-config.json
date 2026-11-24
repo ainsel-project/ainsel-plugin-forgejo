@@ -22,7 +22,15 @@
           "type": "yaml",
           "path": "chart/Chart.yaml",
           "jsonpath": "$.appVersion"
-        }
+        },
+        {
+          "type": "json",
+          "path": "ui/package.json",
+          "jsonpath": "$.version"
+        },
+        "README.md",
+        "docs/installation.md",
+        "docs/quickstart.md"
       ]
     }
   }

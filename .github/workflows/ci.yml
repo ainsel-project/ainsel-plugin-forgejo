@@ -53,6 +53,21 @@ jobs:
       - name: Build the UI bundle
         run: make ui
 
+      # The gates that read the sources rather than the bundle, in the cheap-first
+      # order the Go block uses. tsc --noEmit is the only check that catches a
+      # broken page before it reaches the bundle the manifest loads; the eslint
+      # config makes no-explicit-any an error, which is what keeps the console's
+      # ComponentProps<any> primitives from swallowing new untyped handlers; and
+      # prettier is checked the way the docs-site job checks it. All blocking.
+      - name: Typecheck the UI
+        run: pnpm -C ui typecheck
+
+      - name: Lint the UI
+        run: pnpm -C ui lint
+
+      - name: Check UI formatting
+        run: pnpm -C ui format:check
+
       - name: Test the UI
         run: pnpm -C ui test
 

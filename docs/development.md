@@ -72,11 +72,15 @@ directory is a clean slate.
 go test ./...                       # the Go half, including the plan/apply rails
 go vet ./...
 pnpm -C ui test                     # the UI's vitest suite
+pnpm -C ui typecheck                # tsc --noEmit over the UI sources
+pnpm -C ui lint                     # eslint (flat config; no-explicit-any is an error)
+pnpm -C ui format:check             # prettier, same config as `pnpm -C ui format`
 bash chart/tests/render_test.sh     # the chart's render tests (make chart-lint)
 ```
 
-CI runs vet, the Go tests, `make ui`, the UI tests, the chart render tests and a build of the
-image — so a branch that fails any of them is not a branch that merges.
+CI runs vet, the Go tests, `make ui`, the UI's typecheck, lint, format check and tests,
+the chart render tests and a build of the image — so a branch that fails any of them is
+not a branch that merges.
 
 ## The UI
 

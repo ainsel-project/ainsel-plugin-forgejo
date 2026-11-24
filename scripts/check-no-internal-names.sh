@@ -26,21 +26,37 @@ done
 
 # The text this repo publishes or serves: docs, the README, Go and UI sources with
 # their fixtures, the plugin content, and the scripts. git ls-files keeps tracked
-# files only, so an untracked scratch file cannot fail someone's CI.
-files=$(git ls-files -- \
+# files only, so an untracked scratch file cannot fail someone's CI. NUL-delimited
+# end to end, so a path containing a space stays one path.
+mapfile -d '' -t files < <(git ls-files -z -- \
   'docs' 'README.md' 'content' 'ui/src' 'scripts' '.github' \
   '*.go' '*_test.go' '*.json' '*.md' '*.yml' '*.yaml')
 
 # .github/CODEOWNERS is the one tracked file allowed to name a person: naming the maintainer is
 # what that file is for, and an entry that named nobody would own nothing.
-files=$(printf '%s\n' "$files" | grep -v '^\.github/CODEOWNERS$')
+kept=()
+for f in "${files[@]}"; do
+  [ "$f" = ".github/CODEOWNERS" ] && continue
+  kept+=("$f")
+done
+files=("${kept[@]}")
+
+# A guard that looked at nothing must not report success — the same reflex as the
+# shallow-clone check in secret-scan.yml: if git ls-files fails or matches nothing,
+# the grep below would have no input and the gate would be green while blind.
+if [ "${#files[@]}" -eq 0 ]; then
+  echo '::error::check-no-internal-names: no tracked files to check' >&2
+  exit 1
+fi
 
 status=0
 for needle in "${patterns[@]}"; do
-  hits=$(grep -Iin -- "$needle" $files || true)
+  # -l names the files only: the CI log of a public repo should say where the guard
+  # tripped without echoing the retired identifier itself.
+  hits=$(printf '%s\0' "${files[@]}" | xargs -0 grep -Il -- "$needle" || true)
   if [ -n "$hits" ]; then
     status=1
-    printf '%s found in the published tree:\n' "$needle"
+    printf 'A retired identifier is in these files:\n'
     printf '%s\n' "$hits"
   fi
 done

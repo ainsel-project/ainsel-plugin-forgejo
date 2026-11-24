@@ -117,6 +117,20 @@ Every AInsel resource the wizard creates is stamped `managedBy: plugin-forgejo` 
 
 **Uninstall the plugin** removes the `Plugin` resource and, with it, the `plugin-forgejo` MCP server row and the `forgejo-forgejo` skill row, both of which the hub maintains. What it does *not* do today is delete the resources each install created — and since those carry the plugin as their manager, the console cannot delete them either: **run "Remove install" for every install first**, which deletes them as the named manager.
 
+## Compatibility
+
+`ainsel-plugin.json` is the contract with the hub, and its `pluginApi` field is
+that contract's version — not the plugin's own version. Keep the plugin release
+and the hub within one another's API level.
+
+| Plugin version | Plugin API (`pluginApi`) | AInsel platform |
+| --- | --- | --- |
+| 0.1.0 – 0.3.0 (every release so far) | 1.1 | a hub serving the Plugin API 1.1 contract |
+
+A new row belongs here whenever `pluginApi` changes. The exact minimum AInsel
+release per row still needs the author's release history — `pluginApi` is what
+the hub negotiates, so the contract column cannot drift from the code.
+
 ## Installation
 
 Helm releases are at `oci://ghcr.io/ainsel-project/charts/forgejo`. A release is created with every tag `v*` pushed to this repo; the release workflow builds, signs and charts the image, and prints the digest to the job summary.
@@ -125,7 +139,9 @@ Install with a pinned image digest (required; mutable tags are rejected):
 
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  --version 0.1.0 \
+  <!-- x-release-please-start-version -->
+  --version 0.3.0 \
+  <!-- x-release-please-end -->
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:…
 ```

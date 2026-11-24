@@ -14,7 +14,9 @@ refuses to render without an image digest, because AInsel pins a plugin by diges
 
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  --version 0.1.0 \
+  <!-- x-release-please-start-version -->
+  --version 0.3.0 \
+  <!-- x-release-please-end -->
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:… \
   --set forgejo.baseURL=https://forgejo.example.com

@@ -117,7 +117,7 @@ func TestWorkRoutesRefuseARequestWithNoCaller(t *testing.T) {
 	targets := []string{
 		"/api/now",
 		"/api/work",
-		"/api/work/dpinsel/apps/12",
+		"/api/work/acme/apps/12",
 		"/api/agents/forgejo-developer/work",
 		"/api/invocations/inv-1/work",
 	}
@@ -146,7 +146,7 @@ func TestWorkRoutesCallTheHubWithTheCallersCredential(t *testing.T) {
 	targets := []string{
 		"/api/now",
 		"/api/work",
-		"/api/work/dpinsel/apps/12",
+		"/api/work/acme/apps/12",
 		"/api/agents/forgejo-developer/work",
 		"/api/invocations/inv-1/work",
 	}
@@ -319,7 +319,7 @@ func TestItemRouteServesOneThread(t *testing.T) {
 	h := testHandler(t, newSpy(), appsInstall())
 
 	t.Run("issue", func(t *testing.T) {
-		rec := doGet(t, h, "/api/work/dpinsel/apps/12", testCredential)
+		rec := doGet(t, h, "/api/work/acme/apps/12", testCredential)
 		res := decode[struct {
 			Item decodedItem `json:"item"`
 		}](t, rec)
@@ -336,7 +336,7 @@ func TestItemRouteServesOneThread(t *testing.T) {
 	})
 
 	t.Run("a pull request nested under it", func(t *testing.T) {
-		rec := doGet(t, h, "/api/work/dpinsel/apps/34", testCredential)
+		rec := doGet(t, h, "/api/work/acme/apps/34", testCredential)
 		res := decode[struct {
 			Item decodedItem `json:"item"`
 		}](t, rec)
@@ -346,17 +346,17 @@ func TestItemRouteServesOneThread(t *testing.T) {
 	})
 
 	t.Run("no such thread", func(t *testing.T) {
-		rec := doGet(t, h, "/api/work/dpinsel/apps/99", testCredential)
+		rec := doGet(t, h, "/api/work/acme/apps/99", testCredential)
 		wantError(t, rec, http.StatusNotFound, "no such work item")
 	})
 
 	t.Run("not a number", func(t *testing.T) {
-		rec := doGet(t, h, "/api/work/dpinsel/apps/all", testCredential)
+		rec := doGet(t, h, "/api/work/acme/apps/all", testCredential)
 		wantError(t, rec, http.StatusBadRequest, "invalid item number")
 	})
 
 	t.Run("not a number that names a page", func(t *testing.T) {
-		rec := doGet(t, h, "/api/work/dpinsel/apps/0", testCredential)
+		rec := doGet(t, h, "/api/work/acme/apps/0", testCredential)
 		wantError(t, rec, http.StatusBadRequest, "invalid item number")
 	})
 }

@@ -390,10 +390,10 @@ func TestPlanBlocking(t *testing.T) {
 			input: func(in *Input) {
 				r := RoleDeveloper
 				ri := in.Roles[r]
-				ri.Runtime = "dpinsel/ainsel-pi-maui"
+				ri.Runtime = "acme/ainsel-pi-maui"
 				in.Roles[r] = ri
 			},
-			want: `role "developer": runtime dpinsel/ainsel-pi-maui has no tag or digest — add a tag such as :8.0, or a @sha256: digest`,
+			want: `role "developer": runtime acme/ainsel-pi-maui has no tag or digest — add a tag such as :8.0, or a @sha256: digest`,
 		},
 		{
 			name: "role without a model in the settings",
@@ -617,7 +617,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 			Runtime: testRuntime, Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1",
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
-			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "sk-new",
+			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "new-provider-key",
 		}
 		got := Plan(in, snap)
 		want := Op{Kind: KindAgent, Name: "forgejo-reviewer-apps", Detail: `llm key (custom): "none" -> "set"`, Role: RoleReviewer, Field: FieldLLMCustomKey}
@@ -625,7 +625,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 			t.Errorf("change = %s, want it to contain %s", opsString(got.Change), want)
 		}
 		for _, op := range got.Change {
-			if strings.Contains(op.Detail, "sk-new") {
+			if strings.Contains(op.Detail, "new-provider-key") {
 				t.Errorf("op detail %q spells the key", op.Detail)
 			}
 		}
@@ -635,10 +635,10 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{
 			Runtime: testRuntime, Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1",
-			CustomKeyHash: CustomKeyFingerprint("sk-old"),
+			CustomKeyHash: CustomKeyFingerprint("old-provider-key"),
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
-			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "sk-new",
+			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "new-provider-key",
 		}
 		got := Plan(in, snap)
 		want := Op{Kind: KindAgent, Name: "forgejo-reviewer-apps", Detail: "llm key (custom) replaced", Role: RoleReviewer, Field: FieldLLMCustomKey}
@@ -651,10 +651,10 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{
 			Runtime: testRuntime, Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1",
-			CustomKeyHash: CustomKeyFingerprint("sk-new"),
+			CustomKeyHash: CustomKeyFingerprint("new-provider-key"),
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
-			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "sk-new",
+			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "new-provider-key",
 		}
 		got := Plan(in, snap)
 		for _, op := range got.Change {
@@ -708,7 +708,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 			Runtime: testRuntime, Provider: LLMProviderOpenAI, Model: "gpt-5.2",
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
-			Provider: LLMProviderOpenAI, Model: "gpt-5.2", OpenAIKey: "sk-new",
+			Provider: LLMProviderOpenAI, Model: "gpt-5.2", OpenAIKey: "new-provider-key",
 		}
 		got := Plan(in, snap)
 		want := Op{Kind: KindAgent, Name: "forgejo-reviewer-apps", Detail: `llm key (openai): "none" -> "set"`, Role: RoleReviewer, Field: FieldLLMOpenAIKey}
@@ -716,7 +716,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 			t.Errorf("change = %s, want it to contain %s", opsString(got.Change), want)
 		}
 		for _, op := range got.Change {
-			if strings.Contains(op.Detail, "sk-new") {
+			if strings.Contains(op.Detail, "new-provider-key") {
 				t.Errorf("op detail %q spells the key", op.Detail)
 			}
 		}
@@ -726,10 +726,10 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{
 			Runtime: testRuntime, Provider: LLMProviderAnthropic, Model: "claude",
-			AnthropicKeyHash: CustomKeyFingerprint("sk-old"),
+			AnthropicKeyHash: CustomKeyFingerprint("old-provider-key"),
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
-			Provider: LLMProviderAnthropic, Model: "claude", AnthropicKey: "sk-new",
+			Provider: LLMProviderAnthropic, Model: "claude", AnthropicKey: "new-provider-key",
 		}
 		got := Plan(in, snap)
 		want := Op{Kind: KindAgent, Name: "forgejo-reviewer-apps", Detail: "llm key (anthropic) replaced", Role: RoleReviewer, Field: FieldLLMAnthropicKey}
@@ -1137,7 +1137,7 @@ func TestRuntimeHasVersion(t *testing.T) {
 		{"registry.example.com/img:8.0", true},
 		{"registry.example.com/img:latest", true},
 		{"registry.example.com/img", false},
-		{"dpinsel/ainsel-pi-maui", false},
+		{"acme/ainsel-pi-maui", false},
 		// A registry port is not a tag, and a port plus a tag is both.
 		{"registry:5000/img", false},
 		{"registry:5000/img:8.0", true},
@@ -1161,9 +1161,9 @@ func TestRuntimeHasVersion(t *testing.T) {
 // stays editable while the plan nags for the fix.
 func TestPlanRuntimeTagOrDigest(t *testing.T) {
 	const (
-		untagged = "dpinsel/ainsel-pi-maui"
-		tagged   = "dpinsel/ainsel-pi-maui:8.0"
-		digest   = "dpinsel/ainsel-pi-maui@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+		untagged = "acme/ainsel-pi-maui"
+		tagged   = "acme/ainsel-pi-maui:8.0"
+		digest   = "acme/ainsel-pi-maui@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 	)
 	msg := func(r Role, ref string) string {
 		return fmt.Sprintf("role %q: runtime %s has no tag or digest — add a tag such as :8.0, or a @sha256: digest", r, ref)
@@ -1268,7 +1268,7 @@ func TestPlanRuntimeTagOrDigest(t *testing.T) {
 // and has no repair but typing it out, so it blocks — or warns, when the install
 // already carries it, which is the same split the floating ref above uses.
 func TestPlanRuntimeWhitespace(t *testing.T) {
-	const clean = "dpinsel/ainsel-pi-go:1.24"
+	const clean = "acme/ainsel-pi-go:1.24"
 	msg := func(r Role, ref string) string {
 		return fmt.Sprintf("role %q: runtime %q contains whitespace — a container image URL has none", r, ref)
 	}
@@ -1293,7 +1293,7 @@ func TestPlanRuntimeWhitespace(t *testing.T) {
 	})
 
 	t.Run("an edit writes the trimmed ref, not the pasted one", func(t *testing.T) {
-		const prior = "dpinsel/ainsel-pi-go:1.23"
+		const prior = "acme/ainsel-pi-go:1.23"
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{Runtime: prior, Provider: "ollama-cloud", Model: "glm-4.7"}
 		setRuntime(&in, RoleReviewer, clean+"\t")
@@ -1314,7 +1314,7 @@ func TestPlanRuntimeWhitespace(t *testing.T) {
 	})
 
 	t.Run("whitespace inside a ref blocks", func(t *testing.T) {
-		for _, bad := range []string{"dpinsel/ainsel pi-go:1.24", "dpinsel/ainsel-pi-go: 1.24", "registry.example.com/img:8\t0"} {
+		for _, bad := range []string{"acme/ainsel pi-go:1.24", "acme/ainsel-pi-go: 1.24", "registry.example.com/img:8\t0"} {
 			in, snap := planInput(t)
 			setRuntime(&in, RoleDeveloper, bad)
 			got := Plan(in, snap)
@@ -1332,7 +1332,7 @@ func TestPlanRuntimeWhitespace(t *testing.T) {
 	})
 
 	t.Run("a ref the install already carries warns instead of blocking", func(t *testing.T) {
-		const bad = "dpinsel/ainsel-pi-go:1.2 4"
+		const bad = "acme/ainsel-pi-go:1.2 4"
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{Runtime: bad, Provider: "ollama-cloud", Model: "glm-4.7"}
 		// The field is left empty, which is "keep what the install has" — the admin is

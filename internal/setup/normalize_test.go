@@ -17,7 +17,7 @@ func TestNormalize(t *testing.T) {
 		ExcludeLabel: " do-not-refine\t",
 		Roles: map[Role]RoleInput{
 			RoleDeveloper: {
-				Runtime:       "dpinsel/ainsel-pi-go:1.24\t",
+				Runtime:       "acme/ainsel-pi-go:1.24\t",
 				AgentName:     " forgejo-developer-apps ",
 				TurnTimeoutMs: " 3600000\n",
 				Tools:         []string{"tool1"},
@@ -48,7 +48,7 @@ func TestNormalize(t *testing.T) {
 	}
 
 	ri := got.Roles[RoleDeveloper]
-	if ri.Runtime != "dpinsel/ainsel-pi-go:1.24" {
+	if ri.Runtime != "acme/ainsel-pi-go:1.24" {
 		t.Errorf("Runtime = %q, want the ref without the tab", ri.Runtime)
 	}
 	if ri.AgentName != "forgejo-developer-apps" {
@@ -63,7 +63,7 @@ func TestNormalize(t *testing.T) {
 
 	// The caller's own map is not written into: a caller that plans and then applies
 	// with the same Input sees no surprise either way.
-	if raw := in.Roles[RoleDeveloper]; raw.Runtime != "dpinsel/ainsel-pi-go:1.24\t" {
+	if raw := in.Roles[RoleDeveloper]; raw.Runtime != "acme/ainsel-pi-go:1.24\t" {
 		t.Errorf("caller's Runtime = %q, want it unchanged", raw.Runtime)
 	}
 
@@ -105,9 +105,9 @@ func TestRuntimeHasWhitespace(t *testing.T) {
 		ref  string
 		want bool
 	}{
-		{"dpinsel/ainsel-pi-go:1.24", false},
+		{"acme/ainsel-pi-go:1.24", false},
 		{"registry:5000/img@sha256:0000", false},
-		{"dpinsel/ainsel pi-go:1.24", true},
+		{"acme/ainsel pi-go:1.24", true},
 		{"img:8\t0", true},
 		{"img:8\n0", true},
 		{"", false},

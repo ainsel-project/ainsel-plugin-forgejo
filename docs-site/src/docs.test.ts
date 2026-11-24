@@ -10,9 +10,8 @@ import path from 'node:path'
 
 const docsDir = path.resolve(process.cwd(), '../docs')
 
-// Only the top level: `docs/design/` and `docs/plans/` are not published (see
-// vite.config.ts), so the sidebar does not name them and their links are not the
-// site's to keep honest.
+// Only the top level: `docs/design/` is not published (see vite.config.ts), so the
+// sidebar does not name it and its links are not the site's to keep honest.
 const files = fs.readdirSync(docsDir).filter((f) => f.endsWith('.md'))
 
 const sidebar = fs.readFileSync(path.join(docsDir, '_sidebar.md'), 'utf8')

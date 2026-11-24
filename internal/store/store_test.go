@@ -142,7 +142,7 @@ func fullInstall(slug string) setup.Install {
 		Slug:        slug,
 		GroupID:     "g-1",
 		BaseURL:     "https://devoper.duckdns.org/forgejo",
-		Org:         "dpinsel",
+		Org:         "acme",
 		ConnectorID: "c-1",
 		MCPServer:   "forgejo-mcp-" + slug,
 		HookID:      42,

@@ -42,7 +42,7 @@ const api = { get, post, put } as unknown as HttpClient;
 export function usePluginContext(): PluginContextValue {
   return {
     pluginId: "forgejo",
-    user: { sub: "u-1", username: "dpinsel", isAdmin: false, groups: [] },
+    user: { sub: "u-1", username: "acme-dev", isAdmin: false, groups: [] },
     hub: api,
     api,
     navigate: () => {},

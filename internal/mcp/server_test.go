@@ -286,8 +286,8 @@ func TestMCPEndpointCallerRequest(t *testing.T) {
 // the URL shape fails here.
 const (
 	testBase    = "https://git.example.test"
-	appsRepo    = "dpinsel/apps"
-	otherRepo   = "dpinsel/other"
+	appsRepo    = "acme/apps"
+	otherRepo   = "acme/other"
 	connectorID = "c-1"
 	credential  = "ainselp_testcaller"
 )

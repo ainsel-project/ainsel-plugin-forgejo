@@ -73,10 +73,14 @@ go test ./...                       # the Go half, including the plan/apply rail
 go vet ./...
 pnpm -C ui test                     # the UI's vitest suite
 bash chart/tests/render_test.sh     # the chart's render tests (make chart-lint)
+bash scripts/check-no-internal-names.sh  # no retired personal identifier in the tree
 ```
 
-CI runs vet, the Go tests, `make ui`, the UI tests, the chart render tests and a build of the
-image — so a branch that fails any of them is not a branch that merges.
+CI runs vet, the Go tests, the retired-name check, `make ui`, the UI tests, the chart render
+tests and a build of the image — so a branch that fails any of them is not a branch that
+merges. The history is scanned for secrets beside them, on every pull request and weekly, by
+`.github/workflows/secret-scan.yml`; [the first result](security/secret-scan-2026-11-24) is
+triaged in `docs/security/`, and a new finding is triaged into the same page or fixed.
 
 ## The UI
 
@@ -103,9 +107,10 @@ both read these files, and the sidebar is `docs/_sidebar.md`.
 - **Link between docs** with the bare slug — `[Live board](live-board)` — not a `.md` path. The
   site turns those into in-site routes; a `foo.md` link is left as a dead click.
 - **In-page anchors** (`[section](#the-section)`) scroll the article.
-- `docs/design/` and `docs/plans/` are the reasoning behind the wizard and the plans that built
-  it. They stay in git, where the links from the README and the code work, and they are not
-  published to the site.
+- The two surfaces differ: the console's Docs page serves `docs/` including the design notes
+  in `docs/design/` — the reasoning behind the wizard — while the published site serves
+  `docs/` alone. `docs/design/` stays in git, where the links from the README and the code
+  work.
 
 ### The docs site
 
@@ -124,7 +129,7 @@ pnpm build     # tsc -b && vite build → dist/
 
 A `vite` plugin serves `../docs/` in development and copies it into `dist/docs` at build time —
 so a doc is edited in place and appears in the artifact, and a doc removed from git does not
-survive in it. `design/` and `plans/` are the two directories left out.
+survive in it. `design/` is the directory left out.
 
 The site is published from `main` by `.github/workflows/deploy-docs-pages.yml`, which builds
 `docs-site/` and uploads `dist/` to GitHub Pages. It is served from a subpath named after the

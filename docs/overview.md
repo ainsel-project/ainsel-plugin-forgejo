@@ -61,5 +61,5 @@ and the published site alike. Add a `- [Title](slug)` line to
 code change.
 
 The repository's own `README.md` holds the short version of this picture; the
-design notes under `docs/design/` and the plans under `docs/plans/` are the
-reasoning behind the wizard and are not published here.
+design notes under `docs/design/` are the reasoning behind the wizard and are not
+published here.

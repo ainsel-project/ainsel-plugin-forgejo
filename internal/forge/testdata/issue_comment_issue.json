@@ -3,9 +3,9 @@
   "repository": {
     "id": 12,
     "name": "cockpit",
-    "owner": { "username": "dpinsel", "full_name": "D. Pinsel" },
-    "full_name": "dpinsel/cockpit",
-    "html_url": "https://git.example.com/dpinsel/cockpit",
+    "owner": { "username": "acme", "full_name": "Morgan Doe" },
+    "full_name": "acme/cockpit",
+    "html_url": "https://git.example.com/acme/cockpit",
     "default_branch": "main"
   },
   "issue": {
@@ -13,14 +13,14 @@
     "number": 142,
     "title": "Nightly sync job silently skips deleted repos",
     "body": "The registry lists nine repositories; the sync log only mentions seven.",
-    "html_url": "https://git.example.com/dpinsel/cockpit/issues/142",
+    "html_url": "https://git.example.com/acme/cockpit/issues/142",
     "state": "open",
     "comments": 1
   },
   "comment": {
     "id": 8841,
     "body": "Reproduced on a fresh install: the two deleted remotes are the ones missing.",
-    "html_url": "https://git.example.com/dpinsel/cockpit/issues/142#issuecomment-8841"
+    "html_url": "https://git.example.com/acme/cockpit/issues/142#issuecomment-8841"
   },
-  "sender": { "username": "dpinsel", "full_name": "D. Pinsel" }
+  "sender": { "username": "acme-dev", "full_name": "Morgan Doe" }
 }

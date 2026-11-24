@@ -18,5 +18,5 @@
     "comments": 0,
     "labels": [{ "id": 3, "name": "bug" }]
   },
-  "sender": { "username": "dpinsel", "full_name": "D. Pinsel" }
+  "sender": { "username": "acme-dev", "full_name": "Morgan Doe" }
 }

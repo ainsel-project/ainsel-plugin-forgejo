@@ -74,7 +74,16 @@ weekly while the benefit decays the same way.
 
 ## Continuous from here
 
-`.github/workflows/secret-scan.yml` repeats this on `pull_request` over the pull's commit range
-and weekly over the whole history (`fetch-depth: 0`, and a `workflow_dispatch` for running it
-by hand after a history change). A new finding there is a finding to triage into this page or
-to fix, in the same shape as above.
+`.github/workflows/secret-scan.yml` repeats this over the **whole history on every trigger** —
+`pull_request`, the weekly schedule, and a `workflow_dispatch` for running it by hand after a
+history change — checking out with `fetch-depth: 0` and failing if the clone came out shallow.
+A new finding there is a finding to triage into this page or to fix, in the same shape as above.
+
+This page is deliberately off the docs-site navigation: it records one scan run at one point in
+time, and it is reached from the Development guide (`docs/development.md`) rather than listed as
+a living page. Its own links are therefore absolute, matching the style above.
+
+A fingerprint names a commit, a file and a line, so it is only stable while none of the three
+move: an edit above the sentinel line changes the line number, and **a history rewrite changes
+every commit sha — after one, `.gitleaksignore` must be re-derived from a fresh scan**, or the
+gate goes red on entries that no longer match anything.

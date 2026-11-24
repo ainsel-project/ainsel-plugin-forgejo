@@ -53,8 +53,8 @@ is for.
 
 ## Not a secret, but not for the public record either
 
-Two things a secret scanner does not report, found by grep in the same pass, both **still
-present in history** and neither fixable by a commit on `main`:
+Three things a secret scanner does not report, found by grep in the same pass, all
+**still present in history** and none fixable by a commit on `main`:
 
 - **Internal planning documents.** `docs/plans/` — three implementation plans naming a real
   person and internal issue numbers — was deleted on `main` by this change. The blobs are

@@ -3,6 +3,12 @@
 # off — pull requests here are routinely opened by AInsel agents, and a mandatory human
 # sign-off on every merge is not this repo's working rule (see CONTRIBUTING.md; the working
 # rule is docs/development.md's "never merge your own").
+#
+# This file is also the single permanent exemption of scripts/check-no-internal-names.sh:
+# naming the maintainer of record is what CODEOWNERS exists to do, so the retired-identifier
+# guard skips exactly this file (see the comment above its loop). Do not "fix" the names here
+# by copying a fixture login in — the exemption is the design, and this is the only tracked
+# file allowed to name a person.
 
 # Everything, unless a line below says otherwise. Swap in an org team once one exists.
 *                               @DominikPinsel

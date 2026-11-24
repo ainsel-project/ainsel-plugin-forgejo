@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fails when a retired personal identifier comes back into the published tree.
+# Fails when a retired personal identifier comes back into the tracked tree.
 #
 # This repo is public, and its fixtures were once seeded with a real person's login.
 # A rename without a guard is a rename that undoes itself the next time someone
@@ -28,9 +28,14 @@ done
 # (as this guard did until now) silently misses the first file type nobody thought
 # of: chart/tests/render_test.sh, a Makefile, a Dockerfile, a docs-site source.
 # With the default inverted, a new file type is covered by default rather than by
-# remembering, and the one exclusion says what genuinely is not published: the
-# design notes in docs/design/. grep below skips binary matches (-I). git ls-files
-# keeps tracked files only, so an untracked scratch file cannot fail someone's CI.
+# remembering. The one exclusion is docs/design/, exempted as internal design
+# reasoning — not because it is unpublished: docs/development.md says the console's
+# Docs page serves docs/ including design/, and only the site excludes it. The
+# design notes are where internal reasoning about this repo lives, so they are
+# exempted by convention, not by fact; a prior pass read them and found no retired
+# identifier, and widening the guard to cover them later is a one-line change.
+# grep below skips binary matches (-I). git ls-files keeps tracked files only, so
+# an untracked scratch file cannot fail someone's CI.
 # NUL-delimited end to end, so a path containing a space stays one path.
 mapfile -d '' -t files < <(git ls-files -z -- . ':(exclude)docs/design')
 
@@ -72,4 +77,4 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-echo "No retired personal identifiers in the published tree."
+echo "No retired personal identifiers in the tracked tree."

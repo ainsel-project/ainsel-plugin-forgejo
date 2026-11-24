@@ -49,9 +49,6 @@ export function useReconcile(api: HttpClient) {
     }
   };
 
-  // The instance list is edited as a whole list, because that is how it is
-  // written: the PUT replaces every row. So the draft is the list, an add or a
-
   // dismiss clears both halves of the last answer: the admin has read it.
   const dismiss = () => {
     setSummary(null);

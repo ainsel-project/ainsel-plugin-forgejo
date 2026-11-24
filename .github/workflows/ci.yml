@@ -36,6 +36,12 @@ jobs:
       - name: Test the plugin binary
         run: go test ./...
 
+      # Fixtures once carried a real person's login. The rename is only durable if
+      # something checks it, and the check has to be a CI step: a rule nobody runs is
+      # a rule the next copied fixture breaks.
+      - name: Check for retired internal names
+        run: bash scripts/check-no-internal-names.sh
+
       # --- UI ---------------------------------------------------------------
       # pnpm is installed before setup-node so the pnpm store can be cached.
       - name: Set up pnpm

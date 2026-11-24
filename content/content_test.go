@@ -167,7 +167,12 @@ func TestPersonasAreTemplated(t *testing.T) {
 		if !strings.Contains(text, "}}") || !strings.Contains(text, "Bot}}") {
 			t.Errorf("Persona(%q) has no {{...Bot}} placeholder", role)
 		}
-		for _, leak := range []string{"refine-agent", "dev-agent", "review-agent", "duckdns"} {
+		// The retired personal identifiers of issue #19, spelled in two pieces: a test
+		// that named them in one piece would be the leak it is looking for.
+		for _, leak := range []string{
+			"refine-agent", "dev-agent", "review-agent", "duckdns",
+			"dpi" + "nsel", "Dominik" + "Pinsel", "D. " + "Pinsel",
+		} {
 			if strings.Contains(text, leak) {
 				t.Errorf("Persona(%q) leaks install-specific name %q", role, leak)
 			}

@@ -2,6 +2,8 @@ module github.com/ainsel-project/ainsel-plugin-forgejo
 
 go 1.26.0
 
+toolchain go1.26.11
+
 require (
 	github.com/mark3labs/mcp-go v1.2.1
 	modernc.org/sqlite v1.61.0

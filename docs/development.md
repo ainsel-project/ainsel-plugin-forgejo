@@ -73,17 +73,21 @@ go test ./...                       # the Go half, including the plan/apply rail
 go vet ./...
 golangci-lint run ./...             # the lint gate — .golangci.yml is a golangci-lint v2 config
 pnpm -C ui test                     # the UI's vitest suite
+pnpm -C ui typecheck                # tsc --noEmit over the UI sources
+pnpm -C ui lint                     # eslint (flat config; no-explicit-any is an error)
+pnpm -C ui format:check             # prettier, same config as `pnpm -C ui format`
 bash chart/tests/render_test.sh     # the chart's render tests (make chart-lint)
 bash scripts/check-no-internal-names.sh  # no retired personal identifier in the tree
 ```
 
-CI runs `golangci-lint run ./...`, vet, the Go tests, the retired-name check, `make ui`, the UI
-tests, the chart render tests and a build of the image — so a branch that fails any of them is not
-a branch that merges. The lint step must find zero issues: dropped errors are fixed at the site
-(`_ =`, with a reason where the choice is not obvious), never silenced by a repo-wide exclusion.
-The history is scanned for secrets beside them, on every pull request and weekly, by
-`.github/workflows/secret-scan.yml`; [the first result](security/secret-scan-2026-11-24) is
-triaged in `docs/security/`, and a new finding is triaged into the same page or fixed.
+CI runs `golangci-lint run ./...`, vet, the Go tests, the retired-name check, `make ui`, the UI's
+typecheck, lint, format check and tests, the chart render tests and a build of the image — so a
+branch that fails any of them is not a branch that merges. The lint step must find zero issues:
+dropped errors are fixed at the site (`_ =`, with a reason where the choice is not obvious), never
+silenced by a repo-wide exclusion. The history is scanned for secrets beside them, on every pull
+request and weekly, by `.github/workflows/secret-scan.yml`; [the first
+result](security/secret-scan-2026-11-24) is triaged in `docs/security/`, and a new finding is
+triaged into the same page or fixed.
 
 Two supply-chain rules hold the workflows themselves. Every `uses:` in
 `.github/workflows/` is pinned to a full commit SHA (tag in a trailing comment), and

@@ -19,7 +19,7 @@ func openStore(t *testing.T) *settings.Store {
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 

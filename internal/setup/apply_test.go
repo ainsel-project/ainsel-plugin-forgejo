@@ -413,7 +413,6 @@ func (f *fakeHub) DeleteTrigger(ctx context.Context, triggerID string) error {
 // forgejo fake
 type fakeForgejo struct {
 	calls              []string
-	adminTokenRequired string
 	createdUsers       map[string]string // login -> token
 	createdTeams       map[string]int64  // name -> id
 	mintedTokens       map[string]string // login -> token

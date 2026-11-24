@@ -79,7 +79,7 @@ func callWith(t *testing.T, header http.Header, url string, id int, method strin
 	if err != nil {
 		t.Fatalf("post %s: %v", method, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(res.Body)

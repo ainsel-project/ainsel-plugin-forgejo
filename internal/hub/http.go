@@ -472,12 +472,7 @@ func (c *HTTPClient) ListMCPServers(ctx context.Context) ([]MCPServer, error) {
 	}
 	out := make([]MCPServer, 0, len(items))
 	for _, it := range items {
-		out = append(out, MCPServer{
-			Name:         it.Name,
-			DisplayName:  it.DisplayName,
-			URL:          it.URL,
-			TokenFromEnv: it.TokenFromEnv,
-		})
+		out = append(out, MCPServer(it))
 	}
 	return out, nil
 }

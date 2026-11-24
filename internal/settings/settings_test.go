@@ -19,7 +19,7 @@ func openStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -158,7 +158,7 @@ func TestSaveRoundTripAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 
 	out, err := s2.All(ctx)
 	if err != nil {
@@ -204,7 +204,7 @@ func TestSettingsShareTheInstallDatabase(t *testing.T) {
 	}
 	setStore, err := Open(dir)
 	if err != nil {
-		installs.Close()
+		_ = installs.Close()
 		t.Fatalf("settings.Open: %v", err)
 	}
 
@@ -217,19 +217,19 @@ func TestSettingsShareTheInstallDatabase(t *testing.T) {
 		t.Fatalf("settings.Save: %v", err)
 	}
 
-	installs.Close()
-	setStore.Close()
+	_ = installs.Close()
+	_ = setStore.Close()
 
 	installs, err = store.Open(dir)
 	if err != nil {
 		t.Fatalf("store reopen: %v", err)
 	}
-	defer installs.Close()
+	defer func() { _ = installs.Close() }()
 	setStore, err = Open(dir)
 	if err != nil {
 		t.Fatalf("settings reopen: %v", err)
 	}
-	defer setStore.Close()
+	defer func() { _ = setStore.Close() }()
 
 	list, err := installs.List(ctx)
 	if err != nil || len(list) != 1 || list[0].Slug != "apps" {
@@ -682,13 +682,13 @@ func TestLegacyKeyRowsAreNeitherServedNorEffective(t *testing.T) {
 		VALUES ('developer', 'llmCustomKey', 'sk-legacy', 1, 'v0.0.0')`); err != nil {
 		t.Fatalf("inserting a legacy key row: %v", err)
 	}
-	s.Close()
+	_ = s.Close()
 
 	s2, err := Open(dir)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 
 	if got, err := s2.Effective(ctx, setup.RoleDeveloper, FieldLLMCustomKey); err != nil || got != "" {
 		t.Errorf("Effective over a legacy key row = %q (%v), want empty", got, err)
@@ -733,13 +733,13 @@ func TestDeleteLLMKeysRemovesOnlyWhatTheMigrationForwarded(t *testing.T) {
 		('developer', 'llmOpenAIKey', 'sk-oai', 1, 'v0.0.0')`); err != nil {
 		t.Fatalf("inserting legacy key rows: %v", err)
 	}
-	s.Close()
+	_ = s.Close()
 
 	s2, err := Open(dir)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 
 	if err := s2.DeleteLLMKeys(ctx, []PendingLLMKey{
 		{Role: "developer", Field: FieldLLMCustomKey},
@@ -771,13 +771,13 @@ func TestAdoptDefaultsLeavesKeyRowsForTheMigration(t *testing.T) {
 		VALUES ('developer', 'llmAnthropicKey', 'sk-legacy', 1, 'v0.0.0')`); err != nil {
 		t.Fatalf("inserting a legacy key row: %v", err)
 	}
-	s.Close()
+	_ = s.Close()
 
 	s2, err := Open(dir)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 
 	if _, err := s2.AdoptDefaults(ctx); err != nil {
 		t.Fatalf("AdoptDefaults: %v", err)

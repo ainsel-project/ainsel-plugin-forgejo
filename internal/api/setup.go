@@ -997,9 +997,8 @@ func (svc *SetupService) Handler() http.Handler {
 			var req struct {
 				AdminToken string `json:"adminToken"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				// Token is optional
-			}
+			// Token is optional: a body that fails to decode simply leaves it empty.
+			_ = json.NewDecoder(r.Body).Decode(&req)
 
 			// Get install by slug
 			inst, err := getInstallBySlug(ctx, s, slug)

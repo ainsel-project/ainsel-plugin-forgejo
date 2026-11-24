@@ -199,7 +199,7 @@ func TestNowListsActiveRunsWithTheirPages(t *testing.T) {
 	}
 
 	// The run that started last is the one being waited on.
-	if got := runs[0].Run.ID; got != "inv-5" {
+	if got := runs[0].ID; got != "inv-5" {
 		t.Errorf("first run = %q, want inv-5 (started last)", got)
 	}
 	if got, want := runs[0].URL, testBase+"/"+otherRepo+"/issues/3"; got != want {
@@ -210,12 +210,12 @@ func TestNowListsActiveRunsWithTheirPages(t *testing.T) {
 	}
 	// The role is not something the hub knows: it comes from the install that
 	// names this agent (ruling R18).
-	if got := runs[0].Run.Role; got != "refiner" {
+	if got := runs[0].Role; got != "refiner" {
 		t.Errorf("run role = %q, want %q", got, "refiner")
 	}
 
 	pr := runs[1]
-	if got := pr.Run.ID; got != "inv-3" {
+	if got := pr.ID; got != "inv-3" {
 		t.Fatalf("second run = %q, want inv-3", got)
 	}
 	if got, want := pr.URL, testBase+"/"+appsRepo+"/pulls/34"; got != want {
@@ -224,7 +224,7 @@ func TestNowListsActiveRunsWithTheirPages(t *testing.T) {
 	if got, want := pr.IssueURL, testBase+"/"+appsRepo+"/issues/12"; got != want {
 		t.Errorf("pull run issueUrl = %q, want %q", got, want)
 	}
-	if got := pr.Run.Role; got != "reviewer" {
+	if got := pr.Role; got != "reviewer" {
 		t.Errorf("pull run role = %q, want reviewer", got)
 	}
 }
@@ -846,7 +846,7 @@ func TestWorkSkipsRetiringInstalls(t *testing.T) {
 func TestWorkNamesEachRunsAgentByItsDisplayName(t *testing.T) {
 	spy := newSpy()
 	runs := fixtureRuns()
-	spy.Fake.Agents = []hub.Ref{{ID: runs[0].Agent, Name: "Refiner of apps"}}
+	spy.Agents = []hub.Ref{{ID: runs[0].Agent, Name: "Refiner of apps"}}
 	svc := NewWorkService(spy, testStore(t, appsInstall()), testBase)
 
 	now, err := svc.Now(context.Background())
@@ -855,13 +855,13 @@ func TestWorkNamesEachRunsAgentByItsDisplayName(t *testing.T) {
 	}
 	named := false
 	for _, r := range now {
-		want := r.Run.Agent
-		if r.Run.Agent == runs[0].Agent {
+		want := r.Agent
+		if r.Agent == runs[0].Agent {
 			want = "Refiner of apps"
 			named = true
 		}
-		if r.Run.AgentName != want {
-			t.Errorf("run %s agentName = %q, want %q", r.Run.ID, r.Run.AgentName, want)
+		if r.AgentName != want {
+			t.Errorf("run %s agentName = %q, want %q", r.ID, r.AgentName, want)
 		}
 	}
 	if !named {

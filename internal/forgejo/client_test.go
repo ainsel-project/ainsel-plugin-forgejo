@@ -612,7 +612,6 @@ func TestAdminDoesNotPrintItsToken(t *testing.T) {
 	for _, s := range []string{
 		a.String(),
 		fmt.Sprintf("%v", a),
-		fmt.Sprintf("%s", a),
 		fmt.Sprintf("%+v", struct {
 			Admin *Admin
 			Step  string

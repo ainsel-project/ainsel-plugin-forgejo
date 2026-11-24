@@ -161,7 +161,7 @@ func (c *Transport) do(ctx context.Context, method, credential, path string, que
 		// and the path — never the credential, which travels in a header.
 		return fmt.Errorf("hub request for %s: %w", path, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// 2xx is the success band, not 200 alone: an API that answers 204 or 206 is
 	// still answering.

@@ -947,7 +947,7 @@ func changeOps(in Input, snap Snapshot, want Install) []Op {
 		// keeps what it holds on an empty write); clearing is what a reset does,
 		// and a reset's row carries the empty default — see docs/setup.md.
 		if provider := snap.llm(r).Provider; provider != "" &&
-			!(provider == LLMProviderOpenAI && IsChatGPTSignIn(snap.llm(r).OpenAIAuthMethod)) {
+			(provider != LLMProviderOpenAI || !IsChatGPTSignIn(snap.llm(r).OpenAIAuthMethod)) {
 			// A role on ChatGPT sign-in has no key to write: the apply never sends
 			// one beside the sign-in method, so previewing a key the agent will
 			// never be given would promise a write that cannot happen (and repeat

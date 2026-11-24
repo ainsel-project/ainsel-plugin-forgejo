@@ -107,19 +107,19 @@ func (f *forgejoStub) client(t *testing.T) *forgejo.Client {
 			switch {
 			case r.URL.Path == "/api/v1/user" && r.Method == http.MethodGet:
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"login": "admin", "is_admin": f.adminIsAdmin})
+				_ = json.NewEncoder(w).Encode(map[string]any{"login": "admin", "is_admin": f.adminIsAdmin})
 			case r.URL.Path == "/api/v1/admin/users" && r.Method == http.MethodPost:
 				if f.failCreateUser {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusBadRequest)
-					json.NewEncoder(w).Encode(map[string]any{"message": "username is invalid"})
+					_ = json.NewEncoder(w).Encode(map[string]any{"message": "username is invalid"})
 					return
 				}
 				w.WriteHeader(http.StatusCreated)
 			case strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.HasSuffix(r.URL.Path, "/teams") && r.Method == http.MethodGet:
 				if p := r.URL.Query().Get("page"); p != "" && p != "1" {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte("[]"))
+					_, _ = w.Write([]byte("[]"))
 					return
 				}
 				out := []map[string]any{}
@@ -127,10 +127,10 @@ func (f *forgejoStub) client(t *testing.T) *forgejo.Client {
 					out = append(out, map[string]any{"id": id, "name": name})
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(out)
+				_ = json.NewEncoder(w).Encode(out)
 			case strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.HasSuffix(r.URL.Path, "/hooks") && r.Method == http.MethodGet:
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(f.orgHooks)
+				_ = json.NewEncoder(w).Encode(f.orgHooks)
 			case strings.HasPrefix(r.URL.Path, "/api/v1/users/") && r.Method == http.MethodGet:
 				login := strings.TrimPrefix(r.URL.Path, "/api/v1/users/")
 				if !f.loginExists[login] {
@@ -138,10 +138,10 @@ func (f *forgejoStub) client(t *testing.T) *forgejo.Client {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"login": login})
+				_ = json.NewEncoder(w).Encode(map[string]any{"login": login})
 			case strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.HasSuffix(r.URL.Path, "/teams"):
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte("[]"))
+				_, _ = w.Write([]byte("[]"))
 			case strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && r.Method == http.MethodGet:
 				if !f.orgExists {
 					w.WriteHeader(http.StatusNotFound)

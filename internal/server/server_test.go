@@ -10,7 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/ainsel-project/ainsel-plugin-forgejo"
+	forgejo "github.com/ainsel-project/ainsel-plugin-forgejo"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/content"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/api"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/manifest"
@@ -416,7 +416,7 @@ func openSettings(t *testing.T) *settings.Store {
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 

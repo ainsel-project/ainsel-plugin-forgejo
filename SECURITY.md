@@ -11,6 +11,13 @@ report is about.
 You get an acknowledgement, and a fix timeline once we understand the problem. Please give
 us time to ship it before anything is disclosed.
 
+## This repository is scanned for secrets
+
+Its full git history is scanned on every pull request and weekly
+(`.github/workflows/secret-scan.yml`), with gitleaks and trufflehog. The first result and the
+triage of what it found are in [docs/security/secret-scan-2026-11-24.md](docs/security/secret-scan-2026-11-24.md)
+— including the one finding, why it is a false positive, and what the scan could not tell us.
+
 ## What this plugin touches
 
 The whole account is [Credentials and access](docs/credentials.md). In short — and a claim

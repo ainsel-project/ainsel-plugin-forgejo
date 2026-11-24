@@ -1,0 +1,4 @@
+# Gitleaks fingerprints of findings triaged as false positives — one per line, in the
+# format <commit>:<path>:<ruleID>:<line>. See docs/security/secret-scan-2026-11-24.md
+# for the reason each entry is here. Removing an entry is what re-opens the finding.
+fd5171a8c525ae93addc1a1b336966902d435313:internal/mcp/setup_tools_test.go:generic-api-key:726

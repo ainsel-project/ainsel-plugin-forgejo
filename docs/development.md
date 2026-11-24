@@ -73,10 +73,14 @@ go test ./...                       # the Go half, including the plan/apply rail
 go vet ./...
 pnpm -C ui test                     # the UI's vitest suite
 bash chart/tests/render_test.sh     # the chart's render tests (make chart-lint)
+bash scripts/check-no-internal-names.sh  # no retired personal identifier in the tree
 ```
 
-CI runs vet, the Go tests, `make ui`, the UI tests, the chart render tests and a build of the
-image — so a branch that fails any of them is not a branch that merges.
+CI runs vet, the Go tests, the retired-name check, `make ui`, the UI tests, the chart render
+tests and a build of the image — so a branch that fails any of them is not a branch that
+merges. The history is scanned for secrets beside them, on every pull request and weekly, by
+`.github/workflows/secret-scan.yml`; [the first result](security/secret-scan-2026-11-24) is
+triaged in `docs/security/`, and a new finding is triaged into the same page or fixed.
 
 ## The UI
 

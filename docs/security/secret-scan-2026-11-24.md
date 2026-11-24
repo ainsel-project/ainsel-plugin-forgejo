@@ -65,6 +65,13 @@ present in history** and neither fixable by a commit on `main`:
   display name in fixture values. All renamed to the neutral cast (`acme`, `acme-dev`,
   Morgan Doe) on `main`, with each expectation moved in the same commit. Same caveat: the
   old values remain in history.
+- **A dev-instance host in two examples.** `scripts/check-wizard-facts.sh` and
+  `internal/store/store_test.go` carry `devoper.duckdns.org` as an example URL. Decision,
+  recorded so it is tracked rather than silent: **left as-is**. It is a host name from the
+  private install's dev instance, not one of the retired personal identifiers this issue is
+  about, and `duckdns` stays in the persona guard's list (`content/content_test.go`) so the
+  string cannot spread unnoticed. Retire it in a follow-up if the owner wants the host gone
+  from the record too.
 
 Whether to rewrite history (`git filter-repo`, force-push `main`, re-tag `v0.1.0`/`v0.2.0`/
 `v0.3.0`) is the repository owner's call, not a change bundled into a chore pull. Two facts

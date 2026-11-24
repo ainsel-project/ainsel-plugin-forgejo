@@ -635,7 +635,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{
 			Runtime: testRuntime, Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1",
-			CustomKeyHash: CustomKeyFingerprint("sk-old"),
+			CustomKeyHash: CustomKeyFingerprint("old-provider-key"),
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
 			Provider: "custom", Model: "glm-4.7", CustomURL: "https://llm.example/v1", CustomKey: "new-provider-key",
@@ -726,7 +726,7 @@ func TestPlanEditSettingsChangeMovesTheAgent(t *testing.T) {
 		in, snap := editBaseline()
 		snap.Prior[RoleReviewer] = PriorState{
 			Runtime: testRuntime, Provider: LLMProviderAnthropic, Model: "claude",
-			AnthropicKeyHash: CustomKeyFingerprint("sk-old"),
+			AnthropicKeyHash: CustomKeyFingerprint("old-provider-key"),
 		}
 		snap.Settings.LLM[RoleReviewer] = RoleLLM{
 			Provider: LLMProviderAnthropic, Model: "claude", AnthropicKey: "new-provider-key",

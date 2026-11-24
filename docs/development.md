@@ -107,9 +107,10 @@ both read these files, and the sidebar is `docs/_sidebar.md`.
 - **Link between docs** with the bare slug — `[Live board](live-board)` — not a `.md` path. The
   site turns those into in-site routes; a `foo.md` link is left as a dead click.
 - **In-page anchors** (`[section](#the-section)`) scroll the article.
-- The published doc set is `docs/` plus the design notes in `docs/design/` — the reasoning
-  behind the wizard. `docs/design/` stays in git, where the links from the README and the code
-  work, and it is not published to the site.
+- The two surfaces differ: the console's Docs page serves `docs/` including the design notes
+  in `docs/design/` — the reasoning behind the wizard — while the published site serves
+  `docs/` alone. `docs/design/` stays in git, where the links from the README and the code
+  work.
 
 ### The docs site
 

@@ -52,9 +52,11 @@ jobs:
       - name: Check for retired internal names
         run: bash scripts/check-no-internal-names.sh
 
-      # vulncheck against the live Go advisory DB. The tool version is pinned like
-      # the actions are (Dependabot bumps it), so the check itself cannot change
-      # under the job.
+      # vulncheck against the live Go advisory DB. The tool version is pinned so
+      # the check itself cannot change under the job. Unlike the `uses:` pins it
+      # lives in a run: string, which no Dependabot ecosystem tracks — it is
+      # hand-bumped when govulncheck ships a new release; the weekly schedule
+      # above bounds how stale a missed bump can get.
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 

@@ -87,10 +87,11 @@ Two supply-chain rules hold the workflows themselves. Every `uses:` in
 `.github/dependabot.yml` opens one grouped PR a week to move the pins — actions, Go
 modules, both npm directories and the Dockerfile base. CI also runs `govulncheck` against
 the Go advisory database; its version is pinned in the `run:` step rather than a `uses:`
-line, and it is the `github-actions` ecosystem above that bumps it — not a hand edit. The
-whole gate set runs weekly on a schedule, and CodeQL analyses Go (with a build, since the
-action has no `none` build mode for Go) and TypeScript (without one) on main, on pulls and
-weekly.
+line, and a `run:`-string version sits outside every Dependabot ecosystem — that pin is
+hand-bumped when govulncheck ships a new release, and the weekly schedule below bounds
+how stale it can get. The whole gate set runs weekly on a schedule, and CodeQL analyses Go
+(with a build, since the action has no `none` build mode for Go) and TypeScript (without
+one) on main, on pulls and weekly.
 
 ## The UI
 

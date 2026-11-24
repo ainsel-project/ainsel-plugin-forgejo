@@ -4,9 +4,9 @@
 
 import { Panel, RegisterTable, Tag } from "@ainsel/plugin-sdk";
 import { DASH, formatCost, formatDuration, formatRelative } from "../format";
+import { Timeline } from "./charts";
 import { AGENT_STATUS, agentStatus, initials, roleColor, spendOf, subjectLabel, successPercent } from "./model";
 import type { AgentRow } from "./model";
-import { Timeline } from "./charts";
 import { Scroll, ThreadLink } from "./parts";
 
 // AgentFleet is the "Agent fleet" panel: the agents of the window, most recently

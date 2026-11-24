@@ -68,10 +68,9 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
       }
 
       try {
-        const response = (await api.get(
-          `/setup/installs/${install.slug}/deliveries`,
-          { query: { since: new Date(startedAt).toISOString() } },
-        )) as { verified: boolean; at: string | null };
+        const response = (await api.get(`/setup/installs/${install.slug}/deliveries`, {
+          query: { since: new Date(startedAt).toISOString() },
+        })) as { verified: boolean; at: string | null };
 
         if (cancelled) return;
         failures = 0;
@@ -122,9 +121,7 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
   if (timedOut) {
     return (
       <div className="forgejo-connect" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <Notice variant="warn">
-          No delivery detected after 60 seconds. Check the webhook status manually.
-        </Notice>
+        <Notice variant="warn">No delivery detected after 60 seconds. Check the webhook status manually.</Notice>
         <div className="forgejo-hint" style={{ fontSize: "0.8125rem", color: "var(--ink-2)" }}>
           <p>Recent Deliveries:</p>
           <p>
@@ -186,8 +183,8 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
           }}
         />
         <span>
-          <strong style={{ fontWeight: 600 }}>Waiting for the first event…</strong>{" "}
-          This turns green when Forgejo delivers a webhook to the install.
+          <strong style={{ fontWeight: 600 }}>Waiting for the first event…</strong> This turns green when Forgejo
+          delivers a webhook to the install.
         </span>
       </div>
 
@@ -198,35 +195,51 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
       {/* The checklist is what the admin does, in order. Forgejo offers its test-delivery button on
           repository hooks only (V10), so the one step the admin takes for an organization webhook
           is a real event. */}
-      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.625rem", fontSize: "0.875rem" }}>
+      <ol
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.625rem",
+          fontSize: "0.875rem",
+        }}
+      >
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("done")}>✓</span>
+          <span aria-hidden="true" style={checkNumStyle("done")}>
+            ✓
+          </span>
           <span style={{ color: "var(--ink-2)", paddingTop: "0.0625rem" }}>
             {`Organization webhook created on ${host}/${install.org}`}
           </span>
         </li>
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("current")}>2</span>
+          <span aria-hidden="true" style={checkNumStyle("current")}>
+            2
+          </span>
           <span style={{ color: "var(--ink-2)", paddingTop: "0.0625rem" }}>
             {`Send one event: open an issue, or comment on one, in any repository of ${install.org}.`}
           </span>
         </li>
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("todo")}>3</span>
+          <span aria-hidden="true" style={checkNumStyle("todo")}>
+            3
+          </span>
           <span style={{ color: "var(--ink-3)", paddingTop: "0.0625rem" }}>First event received</span>
         </li>
       </ol>
 
       <div className="forgejo-hint" style={{ fontSize: "0.8125rem", color: "var(--ink-2)" }}>
         <p style={{ margin: 0 }}>
-          You can finish now. The install is complete. It is marked verified when the first event
-          arrives, and you can come back here from the installs list.
+          You can finish now. The install is complete. It is marked verified when the first event arrives, and you can
+          come back here from the installs list.
         </p>
         <p style={{ margin: "0.5rem 0 0" }}>
           <a href={hookUrl} target="_blank" rel="noopener noreferrer">
             Open the webhook settings
-          </a>
-          {" "}to see Recent Deliveries in Forgejo.
+          </a>{" "}
+          to see Recent Deliveries in Forgejo.
         </p>
       </div>
 
@@ -254,7 +267,9 @@ function checkNumStyle(state: "done" | "current" | "todo"): CSSProperties {
     fontSize: "0.6875rem",
     fontWeight: 600,
   };
-  if (state === "done") return { ...base, background: "var(--signal)", color: "var(--paper)", border: "1px solid var(--signal)" };
-  if (state === "current") return { ...base, background: "var(--paper)", color: "var(--signal)", border: "2px solid var(--signal)" };
+  if (state === "done")
+    return { ...base, background: "var(--signal)", color: "var(--paper)", border: "1px solid var(--signal)" };
+  if (state === "current")
+    return { ...base, background: "var(--paper)", color: "var(--signal)", border: "2px solid var(--signal)" };
   return { ...base, background: "var(--paper)", color: "var(--ink-3)", border: "1px solid var(--hair)" };
 }

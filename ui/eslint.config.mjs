@@ -25,7 +25,16 @@ export default [
       sourceType: "module",
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          // `const { [k]: _gone, ...rest } = m` — the dropped name is the pattern's
+          // punctuation, not a binding.
+          ignoreRestSiblings: true,
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "error",
       // The same three the docs-site config turns off, for the same reason: they
       // police patterns the console's SDK already blesses, not bugs.

@@ -41,12 +41,7 @@ describe("ForgejoInvocationPanel", () => {
       siblingsCostKnown: false,
     });
 
-    render(
-      <ForgejoInvocationPanel
-        invocationId="invoc-123"
-        agentName="test-agent"
-      />
-    );
+    render(<ForgejoInvocationPanel invocationId="invoc-123" agentName="test-agent" />);
 
     // The panel should render and find the invocation ID or agent name
     const panel = await screen.findByTestId("panel");

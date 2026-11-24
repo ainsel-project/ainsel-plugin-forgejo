@@ -105,7 +105,10 @@ export interface InvocationResponse {
 
 // WorkApi is the slice of the SDK's HttpClient the UI uses for work endpoints.
 export interface WorkApi {
-  get(path: string, init?: { query?: Record<string, string> }): Promise<WorkResponse | NowResponse | ItemResponse | InvocationResponse>;
+  get(
+    path: string,
+    init?: { query?: Record<string, string> },
+  ): Promise<WorkResponse | NowResponse | ItemResponse | InvocationResponse>;
 }
 
 // Setup API types
@@ -420,10 +423,7 @@ export function fetchInstances(api: HttpClient): Promise<InstancesResponse> {
 // putInstances replaces the whole list. Like the settings PUT, a refused write
 // names each bad row on the error's body and changes nothing; on success the
 // answer is the stored list, with the addresses already normalized.
-export function putInstances(
-  api: HttpClient,
-  instances: ForgejoInstance[],
-): Promise<InstancesResponse> {
+export function putInstances(api: HttpClient, instances: ForgejoInstance[]): Promise<InstancesResponse> {
   return api.put<InstancesResponse>("/instances", { instances });
 }
 

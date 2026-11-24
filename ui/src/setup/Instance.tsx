@@ -32,11 +32,7 @@ interface InstanceProps {
 // than a route the wizard owns.
 function SettingsLink() {
   return (
-    <a
-      className="forgejo-settings-link"
-      href="settings"
-      style={{ color: "inherit", textDecoration: "underline" }}
-    >
+    <a className="forgejo-settings-link" href="settings" style={{ color: "inherit", textDecoration: "underline" }}>
       Settings → Forgejo instances
     </a>
   );
@@ -58,8 +54,7 @@ export function Instance({
   // leaving the select untouched keeps that address, which is what the plan's
   // blank-baseUrl rule means. It is flagged here rather than hidden, because
   // the address is about to be the thing an admin wonders about.
-  const keepCurrent =
-    !!currentBaseUrl && !instances.some((i) => i.baseUrl === currentBaseUrl);
+  const keepCurrent = !!currentBaseUrl && !instances.some((i) => i.baseUrl === currentBaseUrl);
   const hasInstances = instances.length > 0;
 
   // Nothing to pick and no install to keep: the step cannot go on. This is the
@@ -73,30 +68,26 @@ export function Instance({
     <div className="forgejo-instance" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       {isGroupBlocked && (
         <Notice variant="err">
-          This group is not granted to the plugin. An admin grants it in the AInsel console under Plugins → Forgejo → Group Access (or with set_plugin_group_access).
+          This group is not granted to the plugin. An admin grants it in the AInsel console under Plugins → Forgejo →
+          Group Access (or with set_plugin_group_access).
         </Notice>
       )}
 
       {!hasInstances && (
         <Notice variant="err">
-          No Forgejo instance is configured, so there is nothing to install against. Add one on{" "}
-          <SettingsLink />.
+          No Forgejo instance is configured, so there is nothing to install against. Add one on <SettingsLink />.
         </Notice>
       )}
 
       {keepCurrent && (
         <Notice variant="warn">
-          This install points at <code>{currentBaseUrl}</code>, which is not a configured instance.
-          Leaving the choice untouched keeps that address; picking a listed one moves the install.
+          This install points at <code>{currentBaseUrl}</code>, which is not a configured instance. Leaving the choice
+          untouched keeps that address; picking a listed one moves the install.
         </Notice>
       )}
 
       <div style={FIELD_GRID_STYLE}>
-        <Field
-          htmlFor="instance-slug"
-          label="Install name"
-          hint="Lower case, used in every resource name."
-        >
+        <Field htmlFor="instance-slug" label="Install name" hint="Lower case, used in every resource name.">
           <Input
             id="instance-slug"
             value={input.slug}
@@ -105,11 +96,7 @@ export function Instance({
           />
         </Field>
 
-        <Field
-          htmlFor="instance-group"
-          label="Owning group"
-          hint="Who can see and run this install's agents."
-        >
+        <Field htmlFor="instance-group" label="Owning group" hint="Who can see and run this install's agents.">
           <Select
             id="instance-group"
             value={input.groupId}
@@ -134,18 +121,12 @@ export function Instance({
               value={input.baseUrl}
               onChange={(url: string) => setInput({ ...input, baseUrl: url })}
               options={instances.map((i) => ({ value: i.baseUrl, label: `${i.name} — ${i.baseUrl}` }))}
-              emptyLabel={
-                keepCurrent ? `Keep ${currentBaseUrl}` : "Select an instance"
-              }
+              emptyLabel={keepCurrent ? `Keep ${currentBaseUrl}` : "Select an instance"}
             />
           </Field>
         )}
 
-        <Field
-          htmlFor="instance-org"
-          label="Organization"
-          hint="Agents act on every repository in it."
-        >
+        <Field htmlFor="instance-org" label="Organization" hint="Agents act on every repository in it.">
           <Input
             id="instance-org"
             value={input.org}

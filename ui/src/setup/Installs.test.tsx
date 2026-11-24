@@ -35,11 +35,11 @@ describe("Installs (S0)", () => {
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
     // Should render the install list
-    expect(container.querySelector('.forgejo-installs')).toBeTruthy();
+    expect(container.querySelector(".forgejo-installs")).toBeTruthy();
     expect(container.textContent).toContain("apps");
   });
 
@@ -65,11 +65,11 @@ describe("Installs (S0)", () => {
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
     // Should have a remove button
-    const removeBtn = container.querySelector('.forgejo-remove-btn');
+    const removeBtn = container.querySelector(".forgejo-remove-btn");
     expect(removeBtn).toBeTruthy();
   });
 
@@ -111,9 +111,7 @@ describe("Installs (S0)", () => {
     );
 
     await user.click(container.querySelector(".forgejo-remove-btn") as HTMLButtonElement);
-    const confirm = container.querySelector(
-      ".forgejo-confirm-remove-btn",
-    ) as HTMLButtonElement;
+    const confirm = container.querySelector(".forgejo-confirm-remove-btn") as HTMLButtonElement;
     expect(confirm).toBeTruthy();
 
     await user.click(confirm);
@@ -217,10 +215,10 @@ describe("Installs (S0)", () => {
         onEditInstall={onEditInstall}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
-    const editBtn = container.querySelector('.forgejo-edit-btn');
+    const editBtn = container.querySelector(".forgejo-edit-btn");
     expect(editBtn).toBeTruthy();
     await user.click(editBtn!);
     expect(onEditInstall).toHaveBeenCalledWith("apps");
@@ -494,9 +492,7 @@ describe("Installs (S0)", () => {
   it("a refused plan names the refusal and leaves no delete behind", async () => {
     post.mockImplementation(async () => {
       throw httpError("adminToken is required", {
-
         status: 400,
-
       });
     });
 

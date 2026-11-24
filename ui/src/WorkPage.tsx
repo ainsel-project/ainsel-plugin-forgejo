@@ -116,9 +116,7 @@ function stageStateOf(run: Run | null): StageState {
 // handOffStates reads each stage's state off the thread's runs, in hand-off order.
 function handOffStates(item: Item): StageState[] {
   const runs = threadRuns(item);
-  return STAGES.map((stage) =>
-    stageStateOf(newestRun(runs.filter((run) => run.role === stage.role))),
-  );
+  return STAGES.map((stage) => stageStateOf(newestRun(runs.filter((run) => run.role === stage.role))));
 }
 
 // handOffLabel names the furthest stage the thread has reached, and what it is doing there:
@@ -206,24 +204,22 @@ function columns({ onOpen, highlightKey }: { onOpen: (row: Row) => void; highlig
       header: "Linked PRs",
       width: 120,
       cell: (row: Row) =>
-        row.item.prs.length === 0 ? (
-          DASH
-        ) : (
-          row.item.prs.map((pr, index) => (
-            <span key={`${pr.subject.repo}#${pr.subject.number}`} className="forgejo-nested-pr">
-              {index > 0 ? ", " : ""}
-              <a
-                href={pr.url}
-                target="_blank"
-                rel="noreferrer"
-                className="forgejo-pr-link"
-                style={{ ...MONO, color: "var(--signal)" }}
-              >
-                #{pr.subject.number}
-              </a>
-            </span>
-          ))
-        ),
+        row.item.prs.length === 0
+          ? DASH
+          : row.item.prs.map((pr, index) => (
+              <span key={`${pr.subject.repo}#${pr.subject.number}`} className="forgejo-nested-pr">
+                {index > 0 ? ", " : ""}
+                <a
+                  href={pr.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="forgejo-pr-link"
+                  style={{ ...MONO, color: "var(--signal)" }}
+                >
+                  #{pr.subject.number}
+                </a>
+              </span>
+            )),
     },
     {
       key: "status",
@@ -271,10 +267,7 @@ function columns({ onOpen, highlightKey }: { onOpen: (row: Row) => void; highlig
       header: "Updated",
       width: 96,
       cell: (row: Row) => (
-        <span
-          style={{ color: "var(--ink-2)" }}
-          title={new Date(row.item.lastActivity).toLocaleString()}
-        >
+        <span style={{ color: "var(--ink-2)" }} title={new Date(row.item.lastActivity).toLocaleString()}>
           {formatRelative(row.item.lastActivity, new Date())}
         </span>
       ),
@@ -448,8 +441,7 @@ export function WorkPage() {
   const highlightRow = rows.find(
     (row) =>
       selectedKey !== null &&
-      (itemKey(row.item) === selectedKey ||
-        row.item.prs.some((pr) => itemKey(pr) === selectedKey)),
+      (itemKey(row.item) === selectedKey || row.item.prs.some((pr) => itemKey(pr) === selectedKey)),
   );
   const highlightKey = highlightRow ? itemKey(highlightRow.item) : null;
 
@@ -457,9 +449,7 @@ export function WorkPage() {
   // repository or role that the new period no longer holds is dropped rather than left selected
   // over an empty table.
   const repoOptions = [...new Set(rows.map((row) => row.item.subject.repo))].sort();
-  const roleOptions = sortRoles(
-    new Set(rows.flatMap((row) => threadRuns(row.item).map((run) => run.role))),
-  );
+  const roleOptions = sortRoles(new Set(rows.flatMap((row) => threadRuns(row.item).map((run) => run.role))));
   const activeRepo = repoOptions.includes(repo) ? repo : "";
   const activeRole = roleOptions.includes(role) ? role : "";
   const search = query.trim().toLowerCase().replace(/^#/, "");
@@ -617,9 +607,7 @@ export function WorkPage() {
                     itemKey(row.item) === highlightKey ? "forgejo-work-row-selected" : undefined
                   }
                   emptyLabel={
-                    rows.length === 0
-                      ? "No issues or pull requests worked on yet"
-                      : "No threads match this view."
+                    rows.length === 0 ? "No issues or pull requests worked on yet" : "No threads match this view."
                   }
                 />
               </div>
@@ -686,13 +674,7 @@ function Header({
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10 }}>
         <Field label="Period" htmlFor="forgejo-work-period">
-          <Select
-            id="forgejo-work-period"
-            size="sm"
-            value={period}
-            onChange={onPeriod}
-            options={PERIODS}
-          />
+          <Select id="forgejo-work-period" size="sm" value={period} onChange={onPeriod} options={PERIODS} />
         </Field>
         <Button onClick={onExport} disabled={!exportable}>
           Export CSV
@@ -776,7 +758,16 @@ function Pager(props: {
 
 function ChevronIcon({ direction }: { direction: "left" | "right" }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <path d={direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
     </svg>
   );
@@ -819,10 +810,7 @@ function flatten(repos: Repo[]): Row[] {
       rows.push({ item, repoUrl: repo.url });
     }
   }
-  return rows.sort(
-    (a, b) =>
-      new Date(b.item.lastActivity).getTime() - new Date(a.item.lastActivity).getTime(),
-  );
+  return rows.sort((a, b) => new Date(b.item.lastActivity).getTime() - new Date(a.item.lastActivity).getTime());
 }
 
 // findThread returns the thread a key names, top-level or nested, with the URL of the repo it
@@ -903,17 +891,7 @@ function exportCsv(rows: Row[], period: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-const CSV_HEADER = [
-  "kind",
-  "number",
-  "title",
-  "repo",
-  "status",
-  "runs",
-  "agent time",
-  "cost",
-  "last activity",
-];
+const CSV_HEADER = ["kind", "number", "title", "repo", "status", "runs", "agent time", "cost", "last activity"];
 
 // toCsv writes one line per thread, in the order the table shows them, with the same values the
 // row shows — the thread's totals, nested pull requests included, each run counted once. Agent time

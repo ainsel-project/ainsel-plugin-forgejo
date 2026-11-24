@@ -296,10 +296,7 @@ export function SetupPage() {
         ...input,
         adminToken: "",
         roles: Object.fromEntries(
-          (Object.entries(input.roles) as [string, RoleInput][]).map(([r, ri]) => [
-            r,
-            { ...ri, llmKey: "" },
-          ]),
+          (Object.entries(input.roles) as [string, RoleInput][]).map(([r, ri]) => [r, { ...ri, llmKey: "" }]),
         ) as Input["roles"],
       });
 
@@ -385,11 +382,8 @@ export function SetupPage() {
   const renderWalk = (step: SetupStep, children: ReactNode) => {
     const index = WIZARD_STEPS.findIndex((s) => s.step === step);
     const fromList = step === "connect" && !applyResult;
-    const title = fromList && connectTarget
-      ? `Connect ${connectTarget.slug}`
-      : editing
-        ? `Edit ${input.slug}`
-        : "New install";
+    const title =
+      fromList && connectTarget ? `Connect ${connectTarget.slug}` : editing ? `Edit ${input.slug}` : "New install";
     return (
       <WizardPanel
         step={step}
@@ -469,13 +463,7 @@ export function SetupPage() {
     return renderWalk(
       "accounts",
       <StepError error={stepError}>
-        <Accounts
-          input={input}
-          setInput={setInput}
-          editing={editing}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
+        <Accounts input={input} setInput={setInput} editing={editing} onNext={handleNext} onBack={handleBack} />
       </StepError>,
     );
   }
@@ -500,12 +488,7 @@ export function SetupPage() {
     return renderWalk(
       "rules",
       <StepError error={stepError}>
-        <Rules
-          input={input}
-          setInput={setInput}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
+        <Rules input={input} setInput={setInput} onNext={handleNext} onBack={handleBack} />
       </StepError>,
     );
   }
@@ -571,11 +554,7 @@ export function SetupPage() {
       return renderWalk(
         "connect",
         <StepError error={stepError}>
-          <Connect
-            install={target}
-            onDone={handleConnectDone}
-            onBack={handleBack}
-          />
+          <Connect install={target} onDone={handleConnectDone} onBack={handleBack} />
         </StepError>,
       );
     }

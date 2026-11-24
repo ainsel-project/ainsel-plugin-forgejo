@@ -7,10 +7,7 @@ export interface ForgejoInvocationPanelProps {
   agentName: string;
 }
 
-export function ForgejoInvocationPanel({
-  invocationId,
-  agentName,
-}: ForgejoInvocationPanelProps) {
+export function ForgejoInvocationPanel({ invocationId, agentName }: ForgejoInvocationPanelProps) {
   const { api } = usePluginContext();
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,17 +39,10 @@ export function ForgejoInvocationPanel({
   return (
     <Panel className="forgejo-invocation-panel">
       <div className="forgejo-item-link-container">
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          className="forgejo-item-link"
-        >
+        <a href={item.url} target="_blank" rel="noreferrer" className="forgejo-item-link">
           {item.subject.kind}/{item.subject.number}
         </a>
-        {item.subject.title && (
-          <span className="forgejo-item-title">{item.subject.title}</span>
-        )}
+        {item.subject.title && <span className="forgejo-item-title">{item.subject.title}</span>}
       </div>
       <div className="forgejo-agent-info">
         <p className="forgejo-agent-name">{agentName}</p>

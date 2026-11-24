@@ -66,10 +66,7 @@ export const DASH = "—";
 export function newestRun(runs: Run[]): Run | null {
   let newest: Run | null = null;
   for (const run of runs) {
-    if (
-      newest === null ||
-      new Date(run.start).getTime() > new Date(newest.start).getTime()
-    ) {
+    if (newest === null || new Date(run.start).getTime() > new Date(newest.start).getTime()) {
       newest = run;
     }
   }

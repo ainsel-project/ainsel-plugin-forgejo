@@ -124,10 +124,7 @@ describe("newestRun", () => {
   });
 
   it("keeps the earlier-listed run when two start at the same time", () => {
-    const runs = [
-      run("first", "2024-06-01T10:00:00Z"),
-      run("second", "2024-06-01T10:00:00Z"),
-    ];
+    const runs = [run("first", "2024-06-01T10:00:00Z"), run("second", "2024-06-01T10:00:00Z")];
     expect(newestRun(runs)?.id).toBe("first");
   });
 });

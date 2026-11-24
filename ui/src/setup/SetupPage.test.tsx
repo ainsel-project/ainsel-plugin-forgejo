@@ -112,10 +112,9 @@ async function walkToRoles(user: ReturnType<typeof userEvent.setup>) {
   // S2 — the admin token (a secret the wizard must never persist). The forge-MCP
   // step this walk used to stop at is gone: the MCP server an install gets is the
   // plugin's, pointed at by the settings store.
-  fireEvent.change(
-    inputByPlaceholder("Personal access token with write:admin scope"),
-    { target: { value: "admin-token-never-store-me" } },
-  );
+  fireEvent.change(inputByPlaceholder("Personal access token with write:admin scope"), {
+    target: { value: "admin-token-never-store-me" },
+  });
   await user.click(screen.getByRole("button", { name: "Continue" }));
 }
 
@@ -192,9 +191,12 @@ describe("SetupPage (the wizard router)", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() =>
-      expect(post).toHaveBeenCalledWith("/setup/plan", expect.objectContaining({
-        baseUrl: "https://forgejo.example.com",
-      })),
+      expect(post).toHaveBeenCalledWith(
+        "/setup/plan",
+        expect.objectContaining({
+          baseUrl: "https://forgejo.example.com",
+        }),
+      ),
     );
   });
 
@@ -243,10 +245,9 @@ describe("SetupPage (the wizard router)", () => {
     assertEveryLabelPointsAtItsControl("S3", container);
     // And the step lets the walk on only once every role has a runtime.
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(
-      screen.getByRole("alert").textContent,
-      "the step says what it is still missing",
-    ).toBe("Enter a runtime container for: refiner, developer, reviewer");
+    expect(screen.getByRole("alert").textContent, "the step says what it is still missing").toBe(
+      "Enter a runtime container for: refiner, developer, reviewer",
+    );
     await pickRuntimes(user);
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -363,18 +364,16 @@ describe("SetupPage (the wizard router)", () => {
         // The shape the console's request() throws for a 502 whose body is
         // { error, report } (frontend/src/api/client.ts).
         throw httpError("CreateUser: user already exists", {
-
           status: 502,
 
           body: {
-          error: "CreateUser: user already exists",
-          report: {
-            created: [],
-            rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
-            leftovers: [],
+            error: "CreateUser: user already exists",
+            report: {
+              created: [],
+              rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
+              leftovers: [],
+            },
           },
-        },
-
         });
       }
       throw new Error(`unexpected POST ${path}`);
@@ -412,9 +411,7 @@ describe("SetupPage (the wizard router)", () => {
     fireEvent.click(applyBtn);
     fireEvent.click(applyBtn);
 
-    expect(
-      post.mock.calls.filter((call) => call[0] === "/setup/apply"),
-    ).toHaveLength(1);
+    expect(post.mock.calls.filter((call) => call[0] === "/setup/apply")).toHaveLength(1);
 
     // The walk continues on the single request that is in flight.
     resolveApply(applyFixture);
@@ -526,18 +523,16 @@ describe("SetupPage (the wizard router)", () => {
       if (path === "/setup/plan") return planFixture;
       if (path === "/setup/apply") {
         throw httpError("CreateUser: user already exists", {
-
           status: 502,
 
           body: {
-          error: "CreateUser: user already exists",
-          report: {
-            created: [],
-            rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
-            leftovers: [],
+            error: "CreateUser: user already exists",
+            report: {
+              created: [],
+              rolledBack: [{ kind: "user", name: "refiner-apps", detail: "" }],
+              leftovers: [],
+            },
           },
-        },
-
         });
       }
       throw new Error(`unexpected POST ${path}`);
@@ -726,9 +721,7 @@ describe("SetupPage (the wizard router)", () => {
 
     // The done screen: installed, and what the apply made.
     await screen.findByText("✓ Installed");
-    expect(
-      screen.getByText(/"apps" is set up for apps on https:\/\/forgejo\.example\.com/),
-    ).toBeTruthy();
+    expect(screen.getByText(/"apps" is set up for apps on https:\/\/forgejo\.example\.com/)).toBeTruthy();
     // The created list is a table: the kind, then its count in the cell beside it.
     expect(screen.getByText("Connector", { selector: "td" }).nextElementSibling?.textContent).toBe("1");
 

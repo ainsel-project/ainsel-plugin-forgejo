@@ -21,14 +21,14 @@ export function exportCsv(rows: Row[], period: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export const CSV_HEADER = ["kind", "number", "title", "repo", "status", "runs", "agent time", "cost", "last activity"];
+const CSV_HEADER = ["kind", "number", "title", "repo", "status", "runs", "agent time", "cost", "last activity"];
 
 // toCsv writes one line per thread, in the order the table shows them, with the same values the
 // row shows — the thread's totals, nested pull requests included, each run counted once. Agent time
 // keeps the table's reading ("3m 05s") so the file and the screen agree; cost is a plain number of
 // dollars, empty when the hub could not price the thread or nothing ran on it, so a spreadsheet can
 // add it up.
-export function toCsv(rows: Row[]): string {
+function toCsv(rows: Row[]): string {
   const lines = [CSV_HEADER.join(",")];
   for (const { item } of rows) {
     const newest = threadStatusRun(item);
@@ -54,6 +54,6 @@ export function toCsv(rows: Row[]): string {
 
 // csvCell quotes a field that holds a separator, a quote or a line break, doubling any quote
 // inside it, as RFC 4180 asks.
-export function csvCell(value: string): string {
+function csvCell(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }

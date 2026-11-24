@@ -4,9 +4,6 @@
 
 import { Button, Field, Select } from "@ainsel/plugin-sdk";
 import { PERIODS } from "./model";
-
-// The header row: what the page is for, and the two actions on the data it shows. The period
-// is the one control that changes what the server returns; the export only reads what is shown.
 export function Header({
   period,
   onPeriod,

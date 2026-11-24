@@ -8,11 +8,6 @@ import { Select } from "@ainsel/plugin-sdk";
 import { PAGE_SIZES } from "./model";
 import { ChevronIcon } from "./parts";
 import { ICON_BUTTON } from "./styles";
-
-// The row under the table: where in the list you are, and how many rows a page holds. Built
-// from the primitives the SDK exposes rather than the console's own Pager, which the SDK does
-// not register — a plugin cannot reach it. Layout is inline because the bundle ships no
-// stylesheet of its own; the classes are there for the console to hang theme on.
 export function Pager(props: {
   first: number;
   last: number;

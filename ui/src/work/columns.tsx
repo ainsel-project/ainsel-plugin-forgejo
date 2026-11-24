@@ -18,12 +18,6 @@ import { MONO, OPEN_BUTTON } from "../WorkItemDetail";
 import { handOffStates, itemKey } from "./model";
 import type { Row } from "./model";
 import { HandOff, KindIcon } from "./parts";
-
-// The columns are built per render because the first one opens the detail panel: the item's
-// title is a button that sets WorkPage's selection, while a small anchor next to it keeps the
-// old meaning of going to Forgejo in a new tab. The two link semantics stay visibly distinct —
-// in-app panel (button) vs external page (anchor). The row itself cannot take a click through
-// the console's table primitive, so the title button is the way in.
 export function columns({ onOpen, highlightKey }: { onOpen: (row: Row) => void; highlightKey: string | null }) {
   return [
     {

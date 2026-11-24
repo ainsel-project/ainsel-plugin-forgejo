@@ -168,12 +168,14 @@ func TestPersonasAreTemplated(t *testing.T) {
 			t.Errorf("Persona(%q) has no {{...Bot}} placeholder", role)
 		}
 		// The retired personal identifiers of issue #19, spelled in two pieces: a test
-		// that named them in one piece would be the leak it is looking for.
+		// that named them in one piece would be the leak it is looking for. Matched
+		// case-insensitively, the same reach as scripts/check-no-internal-names.sh.
+		folded := strings.ToLower(text)
 		for _, leak := range []string{
 			"refine-agent", "dev-agent", "review-agent", "duckdns",
 			"dpi" + "nsel", "Dominik" + "Pinsel", "D. " + "Pinsel",
 		} {
-			if strings.Contains(text, leak) {
+			if strings.Contains(folded, strings.ToLower(leak)) {
 				t.Errorf("Persona(%q) leaks install-specific name %q", role, leak)
 			}
 		}

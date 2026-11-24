@@ -20,21 +20,21 @@
 // hooks for finding a rendered primitive and reading its variant; the real
 // primitives carry neither.
 import { vi } from "vitest";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import type { HttpClient, PluginContextValue } from "@ainsel/plugin-sdk";
 
 // Mock API functions for work endpoints
 export const get = vi.fn<
-  (path: string, init?: { query?: Record<string, string> }) => Promise<any>
+  (path: string, init?: { query?: Record<string, string> }) => Promise<unknown>
 >();
 
 export const post = vi.fn<
-  (path: string, body?: unknown) => Promise<any>
+  (path: string, body?: unknown) => Promise<unknown>
 >();
 
 // The settings page writes through PUT — the console's client has it, so the
 // stand-in does too.
-export const put = vi.fn<(path: string, body?: unknown) => Promise<any>>();
+export const put = vi.fn<(path: string, body?: unknown) => Promise<unknown>>();
 
 // The context `usePluginContext` returns for plugin `forgejo`.
 const api = { get, post, put } as unknown as HttpClient;
@@ -200,7 +200,7 @@ export function Field(props: FieldProps) {
 type InputProps = {
   id?: string;
   value?: string;
-  onChange?: (e: any) => void;
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   type?: string;
   className?: string;
@@ -273,7 +273,7 @@ export function Select(props: SelectProps) {
 type TextareaProps = {
   id?: string;
   value?: string;
-  onChange?: (e: any) => void;
+  onChange?: (e: ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   className?: string;
 };

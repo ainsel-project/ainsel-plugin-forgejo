@@ -1,3 +1,4 @@
+import type { ChangeEvent } from "react";
 import { Button, Field, Input } from "@ainsel/plugin-sdk";
 import type { Input as InputType } from "./model";
 import { StepFooter } from "./Wizard";
@@ -27,7 +28,7 @@ export function Rules({
           <Input
             id="rules-exclude-label"
             value={input.excludeLabel}
-            onChange={(e: any) => setInput({ ...input, excludeLabel: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, excludeLabel: e.target.value })}
             placeholder="do-not-refine"
           />
         </Field>

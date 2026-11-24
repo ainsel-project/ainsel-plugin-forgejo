@@ -4,6 +4,25 @@
 
 import type { HttpClient } from "@ainsel/plugin-sdk";
 
+// The console's HTTP client rejects with an Error that also carries the HTTP
+// `status` and, when the response body parsed as JSON, that body (the parsed
+// apply report rides along on `report` for the routes that attach it there).
+// A catch parameter is `unknown` in strict TypeScript, so every handler that
+// reads one of these goes through this accessor instead of annotating the
+// parameter `any` — the shape the client actually answers, in one place.
+export interface ApiError {
+  status?: number;
+  body?: Record<string, unknown>;
+  report?: unknown;
+  message?: string;
+}
+
+// Reads a thrown value as the shape above. Never throws: a value that is not
+// an Error still answers, with only the fields it happens to carry.
+export function asApiError(err: unknown): ApiError {
+  return (err ?? {}) as ApiError;
+}
+
 // Group is one of the caller's groups as the hub resolved it.
 export interface Group {
   id: string;
@@ -127,7 +146,7 @@ export interface SetupOptions {
 }
 
 export interface SetupInstalls {
-  installs: Array<any>;
+  installs: Install[];
 }
 
 // WorkingHours is the window an agent works in, in the shape the AInsel hub's agent spec

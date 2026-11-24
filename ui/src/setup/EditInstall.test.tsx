@@ -244,9 +244,9 @@ describe("Edit Install (the walk from S0)", () => {
     const container = await editAndWalkTo(user, "Review the plan");
     expect(panelTitle(container)).toBe("Review the plan");
 
-    const planCall = sdk.post.mock.calls.find((c: any[]) => c[0] === "/setup/plan");
+    const planCall = sdk.post.mock.calls.find((c) => c[0] === "/setup/plan");
     expect(planCall, "the walk planned").toBeTruthy();
-    expect((planCall as any)[1].baseUrl).toBe("");
+    expect((planCall![1] as { baseUrl: string }).baseUrl).toBe("");
   });
 
   it("submits the chosen address when the edit moves the install to a listed instance", async () => {
@@ -285,9 +285,9 @@ describe("Edit Install (the walk from S0)", () => {
       await user.click(next);
     }
 
-    const planCall = sdk.post.mock.calls.find((c: any[]) => c[0] === "/setup/plan");
+    const planCall = sdk.post.mock.calls.find((c) => c[0] === "/setup/plan");
     expect(planCall, "the walk planned").toBeTruthy();
-    expect((planCall as any)[1].baseUrl).toBe("https://second.example.com");
+    expect((planCall![1] as { baseUrl: string }).baseUrl).toBe("https://second.example.com");
   });
 
   it("prefills S5 with the install's exclude label", async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { Instance } from "./Instance";
 import { newInput } from "./model";
+import type { Input } from "./model";
 import type { ForgejoInstance } from "../api";
 
 const groups = [
@@ -15,7 +16,7 @@ const groups = [
 function renderStep(
   instances: ForgejoInstance[],
   input = newInput(),
-  overrides: { currentBaseUrl?: string; setInput?: (i: any) => void } = {},
+  overrides: { currentBaseUrl?: string; setInput?: (i: Input) => void } = {},
 ) {
   const setInput = overrides.setInput ?? vi.fn();
   const utils = render(

@@ -1,3 +1,4 @@
+import type { ChangeEvent } from "react";
 import { Button, Field, Input, RegisterTable } from "@ainsel/plugin-sdk";
 import { FieldGrid } from "../layout";
 import type { Input as InputType } from "./model";
@@ -95,7 +96,7 @@ export function Accounts({
             id="accounts-admin-token"
             type="password"
             value={input.adminToken}
-            onChange={(e: any) => setInput({ ...input, adminToken: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, adminToken: e.target.value })}
             placeholder={
               editing
                 ? "leave empty to keep"

@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SettingsPage } from "./SettingsPage";
 import { get, post, put } from "./testing/sdk";
-import type { Setting } from "./api";
+import { httpError } from "./testing/errors";
+import type { Setting, SettingsEdit } from "./api";
 
 const ROLES = ["refiner", "developer", "reviewer"];
 
@@ -110,6 +111,10 @@ function afterEdit(current: Setting[], role: string, field: string, value: strin
 }
 
 // The registry after a batch: every edit in the request, applied in order.
+// The batch body as the PUT sends it. `body` arrives at the mock as `unknown` —
+// the same contract the console's client keeps at runtime.
+const batchEdits = (body: unknown): SettingsEdit[] => (body as { settings: SettingsEdit[] }).settings;
+
 function afterBatch(current: Setting[], edits: { role: string; field: string; value?: string }[]) {
   return edits.reduce(
     (acc, e) => afterEdit(acc, e.role, e.field, e.value ?? ""),
@@ -239,8 +244,8 @@ describe("SettingsPage (the admin's cards)", () => {
 
   it("sends the auth method as an ordinary row save", async () => {
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -261,9 +266,11 @@ describe("SettingsPage (the admin's cards)", () => {
     // row the admin has to change, keeping the draft.
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
+      throw httpError("bad request", {
+
+        status: 400,
+
+        body: {
         fields: [
           {
             role: "refiner",
@@ -271,8 +278,9 @@ describe("SettingsPage (the admin's cards)", () => {
             error: "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
           },
         ],
-      };
-      throw err;
+      },
+
+      });
     });
     await renderLoaded();
 
@@ -324,8 +332,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // and the key save together, and the backend writes the key to the hub's
     // openAI block for the role's agent.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -360,8 +368,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // post-batch values, so the three edits belong in one save — and the page
     // already collects every typed draft into one PUT.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -392,8 +400,8 @@ describe("SettingsPage (the admin's cards)", () => {
       "refiner.llmCustomUrl": { value: "https://old.example.com/v1", dirty: true },
       "refiner.llmCustomKey": { value: "", dirty: true },
     });
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -403,7 +411,7 @@ describe("SettingsPage (the admin's cards)", () => {
     fireEvent.click(within(saveBar()).getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
-    const sent = (put.mock.calls[0][1] as any).settings;
+    const sent = (put.mock.calls[0][1] as { settings: SettingsEdit[] }).settings;
     expect(sent).toEqual([
       { role: "refiner", field: "llmCustomUrl", value: "https://new.example.com/v1" },
     ]);
@@ -425,8 +433,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // is a write onto the role's agents, and one of them refused it. Nothing
     // retries it: the plugin kept no copy to retry from, so the field says so.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
       fields: [
         {
           role: "refiner",
@@ -449,9 +457,11 @@ describe("SettingsPage (the admin's cards)", () => {
     // the admin has to fill in, keeping the draft.
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
+      throw httpError("bad request", {
+
+        status: 400,
+
+        body: {
         fields: [
           {
             role: "refiner",
@@ -459,8 +469,9 @@ describe("SettingsPage (the admin's cards)", () => {
             error: "custom provider needs a URL (set llmCustomUrl in the same save)",
           },
         ],
-      };
-      throw err;
+      },
+
+      });
     });
     await renderLoaded();
 
@@ -483,8 +494,8 @@ describe("SettingsPage (the admin's cards)", () => {
       defaultVersion: RUNNING_VERSION,
     }));
     mockSettingsGet({}, extra);
-    put.mockImplementation(async (_path: string, body: any) =>
-      ({ settings: afterBatch(makeSettings({}, extra), body.settings) }),
+    put.mockImplementation(async (_path: string, body: unknown) =>
+      ({ settings: afterBatch(makeSettings({}, extra), batchEdits(body)) }),
     );
     await renderLoaded();
 
@@ -561,8 +572,8 @@ describe("SettingsPage (batch save)", () => {
   it("collects typed changes as drafts and sends them all in one PUT", async () => {
     const current = makeSettings();
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(current, body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(current, batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -597,8 +608,8 @@ describe("SettingsPage (batch save)", () => {
 
   it("sends a batch that spans roles in the same request", async () => {
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -650,15 +661,18 @@ describe("SettingsPage (batch save)", () => {
     // named (the console's client puts the parsed body on the error).
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
+      throw httpError("bad request", {
+
+        status: 400,
+
+        body: {
         fields: [
           { role: "refiner", field: "llmModel", error: "model must not be empty" },
           { role: "refiner", field: "mcpUrl", error: "not a URL" },
         ],
-      };
-      throw err;
+      },
+
+      });
     });
     await renderLoaded();
 
@@ -722,7 +736,7 @@ describe("SettingsPage (reset and the winner rule)", () => {
     mockSettingsGet({
       "refiner.llmModel": { value: "edited-away", dirty: true, default: "llama3.3" },
     });
-    put.mockImplementation(async (path: string, body: any) => {
+    put.mockImplementation(async (path: string, body: unknown) => {
       expect(path).toBe("/settings");
       expect(body).toEqual({ settings: [{ role: "refiner", field: "llmModel", reset: true }] });
       return { settings: makeSettings() }; // the reset re-adopts the default
@@ -796,7 +810,7 @@ describe("SettingsPage (reset and the winner rule)", () => {
         defaultVersion: "0.0.9",
       },
     });
-    put.mockImplementation(async (_path: string, body: any) => {
+    put.mockImplementation(async (_path: string, body: unknown) => {
       expect(body).toEqual({ settings: [{ role: "refiner", field: "personaText", reset: true }] });
       return { settings: makeSettings() };
     });
@@ -1112,9 +1126,11 @@ describe("SettingsPage (Reconcile now)", () => {
 describe("SettingsPage (access)", () => {
   it("says only admins when the GET says only admins", async () => {
     get.mockImplementation(async () => {
-      const err: any = new Error("forbidden");
-      err.status = 403;
-      throw err;
+      throw httpError("forbidden", {
+
+        status: 403,
+
+      });
     });
     render(<SettingsPage />);
 
@@ -1209,8 +1225,8 @@ describe("SettingsPage (the PR patrol)", () => {
 
   it("saves a changed cadence as the developer's patrolInterval", async () => {
     mockSettingsGet({}, patrolRows());
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings({}, patrolRows()), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings({}, patrolRows()), batchEdits(body)),
     }));
     await renderLoaded();
     fireEvent.click(roleNav("Developer"));

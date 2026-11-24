@@ -52,8 +52,10 @@ fi
 status=0
 for needle in "${patterns[@]}"; do
   # -l names the files only: the CI log of a public repo should say where the guard
-  # tripped without echoing the retired identifier itself.
-  hits=$(printf '%s\0' "${files[@]}" | xargs -0 grep -Il -- "$needle" || true)
+  # tripped without echoing the retired identifier itself. -i keeps the guard at the
+  # same reach as the content test's leak list, which folds case — a renamed fixture
+  # spelled with a capital must not slip through.
+  hits=$(printf '%s\0' "${files[@]}" | xargs -0 grep -Ili -- "$needle" || true)
   if [ -n "$hits" ]; then
     status=1
     printf 'A retired identifier is in these files:\n'

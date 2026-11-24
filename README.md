@@ -137,14 +137,14 @@ Helm releases are at `oci://ghcr.io/ainsel-project/charts/forgejo`. A release is
 
 Install with a pinned image digest (required; mutable tags are rejected):
 
+<!-- x-release-please-start-version -->
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  <!-- x-release-please-start-version -->
   --version 0.3.0 \
-  <!-- x-release-please-end -->
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:…
 ```
+<!-- x-release-please-end -->
 
 The plugin requires AInsel's `plugins.requireSignature: true` (the default) and trusts releases signed with the keyless identity from the GitHub Actions workflow:
 

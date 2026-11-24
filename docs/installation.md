@@ -37,16 +37,16 @@ the hub negotiates, so the contract column cannot drift from the code.
 
 ## Install with Helm
 
+<!-- x-release-please-start-version -->
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  <!-- x-release-please-start-version -->
   --version 0.3.0 \
-  <!-- x-release-please-end -->
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:… \
   --set forgejo.baseURL=https://forgejo.example.com \
   --set plugin.groupAccess[0]=<group-id>
 ```
+<!-- x-release-please-end -->
 
 The chart renders four things: the Deployment and its Service, the PVC the install
 store lives on, a NetworkPolicy admitting only AInsel's own pods, and the

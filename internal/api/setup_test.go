@@ -679,7 +679,7 @@ func TestSetupSnapshotBlocksOnMissingDefaultTools(t *testing.T) {
 	var result struct {
 		Verdict setup.Verdict `json:"verdict"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &result)
+	_ = json.Unmarshal(w.Body.Bytes(), &result)
 
 	if len(result.Verdict.Blocking) == 0 {
 		t.Errorf("expected blocking verdict for missing DefaultTools/CheckTools, got none")
@@ -738,7 +738,7 @@ func TestSetupSnapshotBlocksOnMissingAdmin(t *testing.T) {
 	var result struct {
 		Verdict setup.Verdict `json:"verdict"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &result)
+	_ = json.Unmarshal(w.Body.Bytes(), &result)
 
 	if len(result.Verdict.Blocking) == 0 {
 		t.Errorf("expected blocking verdict when token is not admin, got none")
@@ -784,7 +784,7 @@ func TestSetupDeleteWithoutAdminToken(t *testing.T) {
 		Checklist []string `json:"checklist"`
 		Kept      bool     `json:"kept"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	// The row survives: without the token the hook, teams and users are exactly
 	// what is outstanding, and the row is the only record of what they were.
@@ -870,7 +870,7 @@ func TestSetupDeleteWithAdminToken(t *testing.T) {
 		Deleted   []string `json:"deleted"`
 		Checklist []string `json:"checklist"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	// With admin token, should try to delete Forgejo resources
 	if fg.deleteCalls == 0 {
@@ -946,7 +946,7 @@ func TestSetupDeliveries(t *testing.T) {
 		Verified bool       `json:"verified"`
 		At       *time.Time `json:"at,omitempty"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if !resp.Verified {
 		t.Errorf("verified: got false, want true")
@@ -1057,7 +1057,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 			// Check for specific endpoints in order of specificity
 			if r.URL.Path == "/api/v1/user" && r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"login":    "admin",
 					"is_admin": f.adminIsAdmin,
 				})
@@ -1069,7 +1069,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 			if strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.HasSuffix(r.URL.Path, "/teams") && r.Method == "GET" {
 				if p := r.URL.Query().Get("page"); p != "" && p != "1" {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte("[]"))
+					_, _ = w.Write([]byte("[]"))
 					return
 				}
 				out := []map[string]interface{}{}
@@ -1077,14 +1077,14 @@ func (f *forgejoStub) client() *forgejo.Client {
 					out = append(out, map[string]interface{}{"id": id, "name": name})
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(out)
+				_ = json.NewEncoder(w).Encode(out)
 				return
 			}
 
 			// GET /api/v1/orgs/{org}/hooks - the hook list the orphan sweep reads.
 			if strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.HasSuffix(r.URL.Path, "/hooks") && r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(f.orgHooks)
+				_ = json.NewEncoder(w).Encode(f.orgHooks)
 				return
 			}
 
@@ -1103,7 +1103,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 				}
 				// User exists: return user object
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"login": login,
 				})
 				return
@@ -1116,13 +1116,13 @@ func (f *forgejoStub) client() *forgejo.Client {
 					Email    string `json:"email"`
 					Password string `json:"password"`
 				}
-				json.NewDecoder(r.Body).Decode(&req)
+				_ = json.NewDecoder(r.Body).Decode(&req)
 
 				// Check if we should fail this request
 				if f.failCreateUserWith != nil {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(f.failCreateUserWith.code)
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
 						"message": f.failCreateUserWith.message,
 					})
 					return
@@ -1132,7 +1132,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 				f.botPasswords[req.Username] = req.Password
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"login": req.Username,
 					"email": req.Email,
 				})
@@ -1150,7 +1150,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 				if ok && username == login && f.botPasswords[login] == password {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusCreated)
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
 						"sha1": f.tokenToReturn,
 					})
 					return
@@ -1164,11 +1164,11 @@ func (f *forgejoStub) client() *forgejo.Client {
 				var req struct {
 					Name string `json:"name"`
 				}
-				json.NewDecoder(r.Body).Decode(&req)
+				_ = json.NewDecoder(r.Body).Decode(&req)
 				f.teamCounter++
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"id":   f.teamCounter,
 					"name": req.Name,
 				})
@@ -1188,11 +1188,11 @@ func (f *forgejoStub) client() *forgejo.Client {
 					Secret string `json:"secret"`
 				}
 				// The actual schema has it nested under Config, but decode what we need
-				json.NewDecoder(r.Body).Decode(&req)
+				_ = json.NewDecoder(r.Body).Decode(&req)
 				f.hookCounter++
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"id": f.hookCounter,
 				})
 				return
@@ -1202,7 +1202,7 @@ func (f *forgejoStub) client() *forgejo.Client {
 			if strings.HasPrefix(r.URL.Path, "/api/v1/orgs/") && strings.Contains(r.URL.Path, "/hooks/") && r.Method == "PATCH" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"id": 1,
 				})
 				return
@@ -1727,7 +1727,7 @@ func TestSetupDeleteRemovesPrPatrol(t *testing.T) {
 		Deleted   []string `json:"deleted"`
 		Checklist []string `json:"checklist"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if !contains(resp.Deleted, "cronTrigger:cron-own") {
 		t.Errorf("deleted = %v, want cronTrigger:cron-own", resp.Deleted)
@@ -2053,7 +2053,7 @@ func TestSetupDeleteForgejoFailureKeepsTheRow(t *testing.T) {
 		Checklist []string `json:"checklist"`
 		Kept      bool     `json:"kept"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if !resp.Kept {
 		t.Errorf("kept = false, want true: every Forgejo delete failed")
@@ -2223,7 +2223,7 @@ func TestSetupOrphanDeleteRemovesThePlannedSet(t *testing.T) {
 		Deleted []string `json:"deleted"`
 		Failed  []string `json:"failed"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &report)
+	_ = json.Unmarshal(w.Body.Bytes(), &report)
 	if len(report.Failed) != 0 {
 		t.Errorf("failed = %v, want none", report.Failed)
 	}
@@ -2368,7 +2368,7 @@ func TestSetupOrphanSweepSparesWhatARowStillReferences(t *testing.T) {
 		Deleted []string `json:"deleted"`
 		Failed  []string `json:"failed"`
 	}
-	json.Unmarshal([]byte(body), &report)
+	_ = json.Unmarshal([]byte(body), &report)
 	if len(report.Failed) != 0 {
 		t.Errorf("failed = %v, want none", report.Failed)
 	}

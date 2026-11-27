@@ -611,8 +611,12 @@ func TestAdminDoesNotPrintItsToken(t *testing.T) {
 
 	for _, s := range []string{
 		a.String(),
+		// The string-verb path: the fmt.Sprintf("%s", a) case staticcheck's
+		// S1025 flagged as redundant lived here. fmt.Sprint keeps the guard —
+		// with only a String() method on Admin, Sprint renders exactly what
+		// %s rendered — without the redundancy the linter objected to.
+		fmt.Sprint(a),
 		fmt.Sprintf("%v", a),
-		fmt.Sprintf("%s", a),
 		fmt.Sprintf("%+v", struct {
 			Admin *Admin
 			Step  string

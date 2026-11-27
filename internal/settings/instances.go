@@ -77,7 +77,7 @@ func (s *Store) ListInstances(ctx context.Context) ([]Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("settings: cannot read instances: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []Instance{}
 	for rows.Next() {
@@ -128,7 +128,7 @@ func (s *Store) SaveInstances(ctx context.Context, instances []Instance) error {
 	if err != nil {
 		return fmt.Errorf("settings: cannot begin the instances write: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM forgejo_instances;`); err != nil {
 		return fmt.Errorf("settings: cannot clear the instances: %w", err)

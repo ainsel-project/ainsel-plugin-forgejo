@@ -26,7 +26,7 @@ func newSettingsAPI(t *testing.T) (http.Handler, *settings.Store) {
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return NewSettings(&hub.Fake{}, s, nil, nil), s
 }
 
@@ -340,7 +340,7 @@ func newSettingsAPIWithPass(t *testing.T, rec passRunner) (http.Handler, *record
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	r, ok := rec.(*recordingPass)
 	if !ok {
 		t.Fatalf("test bug: not a recordingPass")
@@ -407,7 +407,7 @@ func TestSettingsPUTRefusesAKeyForARoleWithNoAgent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	rec := &recordingPass{}
 	api := NewSettings(&hub.Fake{}, s, rec, installsOf(string(setup.RoleDeveloper)))
 
@@ -615,7 +615,7 @@ func TestSettingsPUTReconcilesASavedKeyOfEveryProvider(t *testing.T) {
 			if err != nil {
 				t.Fatalf("settings.Open: %v", err)
 			}
-			t.Cleanup(func() { s.Close() })
+			t.Cleanup(func() { _ = s.Close() })
 			rec := &recordingPass{}
 			api := NewSettings(&hub.Fake{}, s, rec, installsOf(string(setup.RoleDeveloper)))
 

@@ -30,6 +30,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # A gate, not documentation: red lint stops the merge. The pinned golangci-lint
+      # must be built with a Go >= the go directive in go.mod — older builds of the
+      # linter refuse this module outright.
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+
       - name: Vet
         run: go vet ./...
 

@@ -86,11 +86,11 @@ func Open(dir string) (*Store, error) {
 
 	ctx := context.Background()
 	if err := dropPreReleaseTable(ctx, db); err != nil {
-		db.Close()
+		_ = db.Close() // the migration error is the one worth returning
 		return nil, fmt.Errorf("store: cannot migrate database in %q: %w", dir, err)
 	}
 	if _, err := db.ExecContext(ctx, schema); err != nil {
-		db.Close()
+		_ = db.Close() // the exec error is the one worth returning
 		return nil, fmt.Errorf("store: cannot create schema in %q: %w", dir, err)
 	}
 	return &Store{db: db}, nil
@@ -172,7 +172,7 @@ func (s *Store) List(ctx context.Context) ([]setup.Install, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: cannot list installs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	installs := []setup.Install{}
 	for rows.Next() {
@@ -199,7 +199,7 @@ func (s *Store) ConnectorIDs(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: cannot list connector ids: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []string
 	seen := map[string]bool{}
@@ -264,21 +264,21 @@ func (s *Store) Subjects(ctx context.Context, eventIDs []string) (map[string]for
 		for rows.Next() {
 			var id, data string
 			if err := rows.Scan(&id, &data); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, fmt.Errorf("store: cannot read an event subject: %w", err)
 			}
 			var subject forge.Subject
 			if err := json.Unmarshal([]byte(data), &subject); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, fmt.Errorf("store: cannot decode the subject of event %q: %w", id, err)
 			}
 			out[id] = subject
 		}
 		if err := rows.Err(); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, fmt.Errorf("store: cannot read event subjects: %w", err)
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 	return out, nil
 }
@@ -302,7 +302,7 @@ func (s *Store) PutSubjects(ctx context.Context, subjects map[string]forge.Subje
 	if err != nil {
 		return fmt.Errorf("store: cannot begin the event subject write: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const q = `
 INSERT INTO event_subjects (event_id, data, read_at)

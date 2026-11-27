@@ -228,7 +228,7 @@ func TestNewAPIRoutesInstancesToSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("settings.Open: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	if err := s.SaveInstances(context.Background(), []settings.Instance{
 		{Name: "Mounted", BaseURL: "https://mounted.example.com"},
 	}); err != nil {

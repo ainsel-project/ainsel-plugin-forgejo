@@ -3183,7 +3183,7 @@ func (h *hubServer) stampEnforcingCreate(path, reply string) func(http.ResponseW
 		asPlugin := r.Header.Get("Authorization") == "Bearer ainselp_bg"
 		if asPlugin && stamp != managerStamp {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, `{"error":"managedBy must be %q for this caller"}`, managerStamp)
+			_, _ = fmt.Fprintf(w, `{"error":"managedBy must be %q for this caller"}`, managerStamp)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)

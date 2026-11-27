@@ -472,12 +472,10 @@ func (c *HTTPClient) ListMCPServers(ctx context.Context) ([]MCPServer, error) {
 	}
 	out := make([]MCPServer, 0, len(items))
 	for _, it := range items {
-		out = append(out, MCPServer{
-			Name:         it.Name,
-			DisplayName:  it.DisplayName,
-			URL:          it.URL,
-			TokenFromEnv: it.TokenFromEnv,
-		})
+		// Conversion, not mapping: it compiles only while mcpItem and
+		// MCPServer stay field- and tag-identical. Any drift is a compile
+		// error here, which is the pin — keep the two structs in step.
+		out = append(out, MCPServer(it))
 	}
 	return out, nil
 }

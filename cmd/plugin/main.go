@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ainsel-project/ainsel-plugin-forgejo"
+	forgejo "github.com/ainsel-project/ainsel-plugin-forgejo"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/api"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/cutover"
 	forgejoapi "github.com/ainsel-project/ainsel-plugin-forgejo/internal/forgejo"

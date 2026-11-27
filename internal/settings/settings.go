@@ -446,7 +446,7 @@ func Open(dir string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.ExecContext(context.Background(), schema); err != nil {
-		db.Close()
+		_ = db.Close() // the exec error is the one worth returning
 		return nil, fmt.Errorf("settings: cannot create schema in %q: %w", dir, err)
 	}
 	return &Store{db: db}, nil
@@ -471,7 +471,7 @@ func (s *Store) All(ctx context.Context) ([]Setting, error) {
 	if err != nil {
 		return nil, fmt.Errorf("settings: cannot read settings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	stored := map[key]storedRow{}
 	for rows.Next() {
@@ -635,7 +635,7 @@ func (s *Store) Save(ctx context.Context, edits []Edit) error {
 	if err != nil {
 		return fmt.Errorf("settings: cannot begin the settings write: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const q = `
 INSERT INTO settings (role, field, value, dirty, default_version)
@@ -912,16 +912,16 @@ func (s *Store) AdoptDefaults(ctx context.Context) ([]Adopted, error) {
 	for rows.Next() {
 		var k key
 		if err := rows.Scan(&k.role, &k.field); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, fmt.Errorf("settings: cannot read a stale default: %w", err)
 		}
 		stale = append(stale, k)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return nil, fmt.Errorf("settings: cannot read stale defaults: %w", err)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	if len(stale) == 0 {
 		return nil, nil
@@ -931,7 +931,7 @@ func (s *Store) AdoptDefaults(ctx context.Context) ([]Adopted, error) {
 	if err != nil {
 		return nil, fmt.Errorf("settings: cannot begin the default write: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const u = `UPDATE settings SET value = ?, default_version = ? WHERE role = ? AND field = ? AND dirty = 0;`
 	adopted := make([]Adopted, 0, len(stale))

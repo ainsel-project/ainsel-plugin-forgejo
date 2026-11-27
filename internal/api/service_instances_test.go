@@ -125,7 +125,7 @@ func TestNowLinksEachInstallToItsOwnForgejo(t *testing.T) {
 
 	byID := map[string]NowRun{}
 	for _, r := range out {
-		byID[r.Run.ID] = r
+		byID[r.ID] = r
 	}
 	if got, want := byID["run-a"].URL, testBase+"/"+repoA+"/issues/1"; got != want {
 		t.Errorf("run-a URL = %q, want %q", got, want)

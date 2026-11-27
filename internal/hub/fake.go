@@ -923,11 +923,9 @@ func (f *Fake) Events(ctx context.Context, connectorID string, since time.Time) 
 
 	var out []Event
 	for _, e := range f.SeedEvents {
-		if connectorID != "" {
-			// The fake doesn't track connector info on events, so it answers with
-			// all seeded events for any named connector and none for any other.
-			// A real hub filters by the connector field.
-		}
+		// The fake doesn't track connector info on events, so it answers with
+		// all seeded events for any named connector and none for any other.
+		// A real hub filters by the connector field.
 		if !since.IsZero() && e.At.Before(since) {
 			continue
 		}

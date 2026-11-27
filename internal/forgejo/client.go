@@ -493,7 +493,7 @@ func (c *Client) request(ctx context.Context, method, path string, query url.Val
 		// which travelled in a header.
 		return fmt.Errorf("forgejo request for %s: %w", path, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// 2xx is the success band, not 200 alone: a delete answers 204.
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ainsel-project/ainsel-plugin-forgejo"
+	forgejo "github.com/ainsel-project/ainsel-plugin-forgejo"
 	"github.com/ainsel-project/ainsel-plugin-forgejo/internal/manifest"
 )
 

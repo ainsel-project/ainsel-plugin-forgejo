@@ -25,11 +25,7 @@ export function columnsForWidth(width: number): number {
 
 // Content tiles (KPI panels, detail cards, the compare diff) → columns: as many tracks of at
 // least `minTrackWidth` as fit, from 1 up to `maxColumns`. 0 again means "width unknown".
-export function cardColumnsForWidth(
-  width: number,
-  minTrackWidth: number,
-  maxColumns: number,
-): number {
+export function cardColumnsForWidth(width: number, minTrackWidth: number, maxColumns: number): number {
   if (width <= 0) return 0;
   return Math.max(1, Math.min(maxColumns, Math.floor(width / minTrackWidth)));
 }
@@ -126,11 +122,7 @@ export function CardGrid({
   return (
     <>
       <style>{LAYOUT_CSS}</style>
-      <div
-        ref={ref}
-        className={classes("ainsel-card-grid", className)}
-        style={gridStyle(columns, gap, style)}
-      >
+      <div ref={ref} className={classes("ainsel-card-grid", className)} style={gridStyle(columns, gap, style)}>
         {children}
       </div>
     </>

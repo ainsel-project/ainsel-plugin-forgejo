@@ -57,7 +57,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-
 function gridOf(container: HTMLElement, selector: string): HTMLElement {
   const grid = container.querySelector<HTMLElement>(selector);
   expect(grid).not.toBeNull();
@@ -217,9 +216,7 @@ describe("no auto-fit remains", () => {
 
   it("refuses an auto-fit grid in any source file", () => {
     // vitest runs with ui/ as cwd; fall back to the repo root if the runner started there.
-    const src = existsSync(join(process.cwd(), "src"))
-      ? join(process.cwd(), "src")
-      : join(process.cwd(), "ui/src");
+    const src = existsSync(join(process.cwd(), "src")) ? join(process.cwd(), "src") : join(process.cwd(), "ui/src");
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

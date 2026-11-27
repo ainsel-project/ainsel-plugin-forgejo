@@ -11,7 +11,8 @@ import {
   turnTimeoutMsFromMinutes,
   workingHoursText,
 } from "./model";
-import { FIELD_GRID_STYLE, MONO_FONT, StepFooter } from "./Wizard";
+import { MONO_FONT, StepFooter } from "./Wizard";
+import { FieldGrid } from "../layout";
 
 // S4 under the created-only wizard: what the admin still decides per role.
 // The pick lists (existing images, existing agents) and the LLM fields are
@@ -292,7 +293,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
           {roleLabel(role)}
         </span>
 
-        <div style={FIELD_GRID_STYLE}>
+        <FieldGrid>
           <Field
             htmlFor={`roles-${role}-agent-name`}
             label="Agent name"
@@ -374,7 +375,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               placeholder="(unchanged)"
             />
           </Field>
-        </div>
+        </FieldGrid>
 
         {/* Working hours are optional in the plainest sense the wizard has: unticked, it sends
             nothing for the field, the plan finds no op for it, and the apply writes neither a
@@ -428,7 +429,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                 })}
               </div>
 
-              <div style={FIELD_GRID_STYLE}>
+              <FieldGrid>
                 <Field
                   htmlFor={`roles-${role}-hours-start`}
                   label="From"
@@ -467,7 +468,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                     placeholder="UTC"
                   />
                 </Field>
-              </div>
+              </FieldGrid>
 
               {/* The window in one line, in the words the preview uses — so what the admin reads
                   here is what the plan will name on the agent's op. */}

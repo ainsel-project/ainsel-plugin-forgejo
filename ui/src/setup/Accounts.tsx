@@ -1,4 +1,5 @@
 import { Button, Field, Input, RegisterTable } from "@ainsel/plugin-sdk";
+import { FieldGrid } from "../layout";
 import type { Input as InputType } from "./model";
 import { ROLE_COLOR } from "./model";
 import { StepFooter } from "./Wizard";
@@ -80,7 +81,7 @@ export function Accounts({
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem 1.25rem" }}>
+      <FieldGrid>
         <Field
           htmlFor="accounts-admin-token"
           label="Forgejo admin token"
@@ -102,7 +103,7 @@ export function Accounts({
             }
           />
         </Field>
-      </div>
+      </FieldGrid>
 
       <StepFooter onBack={onBack}>
         {(editing || input.adminToken) && (

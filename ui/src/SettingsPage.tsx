@@ -29,6 +29,7 @@
 // resources" with the plugin version that provides them. Membership changes by
 // plugin upgrade, nothing else.
 import { Button, Input, Notice, Panel, RegisterTable, Select, Tag, Textarea, usePluginContext } from "@ainsel/plugin-sdk";
+import { CardGrid } from "./layout";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import {
@@ -746,13 +747,7 @@ export function SettingsPage() {
                 </span>
               </div>
               {open && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                    gap: 8,
-                  }}
-                >
+                <CardGrid minTrackWidth={240} maxColumns={2} gap={8}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>
                       Your version
@@ -769,7 +764,7 @@ export function SettingsPage() {
                       {s.default}
                     </pre>
                   </div>
-                </div>
+                </CardGrid>
               )}
             </div>
           )}

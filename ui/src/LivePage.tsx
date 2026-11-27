@@ -1,4 +1,5 @@
 import { Button, Notice, Panel, RegisterTable, Tabs, Tag, usePluginContext } from "@ainsel/plugin-sdk";
+import { CardGrid } from "./layout";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Repo, Run, WorkResponse } from "./api";
 import { DASH, formatAgo, formatCost, formatDuration, formatRelative } from "./format";
@@ -964,10 +965,7 @@ export function LivePage() {
         </Notice>
       )}
 
-      <div
-        className="forgejo-live-stats"
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}
-      >
+      <CardGrid className="forgejo-live-stats" minTrackWidth={170} maxColumns={6} gap={12}>
         <Kpi
           label="Active agents"
           value={`${runningAgents.size + waitingAgents.size} / ${agents.length}`}
@@ -1006,7 +1004,7 @@ export function LivePage() {
               : `Across ${plural(runs.length, "run")}`
           }
         />
-      </div>
+      </CardGrid>
 
       <div className="forgejo-live-charts" style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         <div style={{ flex: "2 1 480px", minWidth: 0 }}>

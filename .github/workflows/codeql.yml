@@ -1,0 +1,66 @@
+name: CodeQL
+
+# Static analysis of the two languages this repository ships, beside (not
+# instead of) vet/govulncheck/eslint: CodeQL models data flow, which is what
+# matters for the parts that touch tokens, the Forgejo API and the console DOM.
+# Runs on pushes to main, on pulls that target main, and weekly — the same
+# three-time pattern as the scheduled CI mirror, offset to a different minute.
+#
+# Build modes: TypeScript analyses without an emit (none is CodeQL's default
+# for it), but Go has no none mode in codeql-action v4.39.4 — so Go takes
+# autobuild with a pinned setup-go step that maps no secrets into the job.
+# Evidence: the pinned toolchain on this repo's own runs, not inference —
+# https://github.com/ainsel-project/ainsel-plugin-forgejo/actions/runs/45410281779/job/138501870345
+# (Analyze (go) on 9248582, which set build-mode: none) failed with:
+#   A fatal error occurred: Go does not support the none build mode.
+#   Please try using one of the following build modes instead: autobuild, manual.
+# Go flips to none if a future codeql-action release gains support.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF for the Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+          - language: javascript-typescript
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # Go's autobuild compiles the repo, so the job needs a Go toolchain;
+      # the same pinned setup-go as ci.yml, and no secret is referenced.
+      - name: Set up Go (Go autobuild)
+        if: matrix.language == 'go'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          languages: ${{ matrix.language }}
+          # build-mode deliberately not set: autobuild (Go's default) and none
+          # (JS/TS's default) are what the header promises. Flip Go to none if
+          # a future codeql-action release supports it.
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          category: /language:${{ matrix.language }}

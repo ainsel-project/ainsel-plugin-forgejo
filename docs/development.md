@@ -85,6 +85,17 @@ The history is scanned for secrets beside them, on every pull request and weekly
 `.github/workflows/secret-scan.yml`; [the first result](security/secret-scan-2026-11-24) is
 triaged in `docs/security/`, and a new finding is triaged into the same page or fixed.
 
+Two supply-chain rules hold the workflows themselves. Every `uses:` in
+`.github/workflows/` is pinned to a full commit SHA (tag in a trailing comment), and
+`.github/dependabot.yml` opens one grouped PR a week to move the pins — actions, Go
+modules, both npm directories and the Dockerfile base. CI also runs `govulncheck` against
+the Go advisory database; its version is pinned in the `run:` step rather than a `uses:`
+line, and a `run:`-string version sits outside every Dependabot ecosystem — that pin is
+hand-bumped when govulncheck ships a new release, and the weekly schedule below bounds
+how stale it can get. The whole gate set runs weekly on a schedule, and CodeQL analyses Go
+(with a build, since the action has no `none` build mode for Go) and TypeScript (without
+one) on main, on pulls and weekly.
+
 ## The UI
 
 `ui/` is a Vite **library** build: it exports the page components the console mounts, and the

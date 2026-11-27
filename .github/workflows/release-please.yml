@@ -1,4 +1,9 @@
 name: Release Please
+# Every action below is pinned to a full commit SHA with its tag in a trailing
+# comment; Dependabot (.github/dependabot.yml) opens the bump PRs. Floating refs
+# let an upstream tag move under a workflow that did not ask for it — and the
+# release workflow's file is the cosign signing identity installers trust
+# (see release.yml), so the whole chain is pinned, not just that file.
 
 # release-please decides *what* the release is; release.yml publishes it.
 #
@@ -41,7 +46,7 @@ jobs:
       # The workflow token on purpose, never a PAT: a tag pushed with a PAT
       # would also fire release.yml's own tag trigger, and the release would be
       # published twice.
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           target-branch: main

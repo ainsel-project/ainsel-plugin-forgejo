@@ -1,4 +1,10 @@
 name: Release
+# Every action below is pinned to a full commit SHA with its tag in a trailing
+# comment; Dependabot (.github/dependabot.yml) opens the bump PRs. The pinning is
+# not hygiene theatre: this file is the cosign signing identity installers trust
+# (release.yml@refs/tags/v.*), so a floating ref here is a mutable signing
+# identity — and this job holds `packages: write` and `id-token: write` while it
+# publishes.
 
 # release-please.yml starts this on the vX.Y.Z tag it just created (a
 # workflow_dispatch with --ref <tag>); pushing a tag by hand runs it too. It
@@ -31,7 +37,7 @@ jobs:
       CHART_OCI: oci://ghcr.io/ainsel-project/charts
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # The v prefix is dropped so the image tag, the chart version and the
       # appVersion all read the same (v0.1.0 -> 0.1.0).
@@ -65,10 +71,10 @@ jobs:
           echo "ok: ainsel-plugin.json version is ${VERSION}"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -76,7 +82,7 @@ jobs:
 
       - name: Describe the image
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.IMAGE }}
           tags: |
@@ -86,7 +92,7 @@ jobs:
 
       - name: Build and push the plugin image
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           push: true
@@ -94,7 +100,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
       # Keyless: the signature carries the workflow's OIDC identity as a
       # certificate, so verification is done against the repo and workflow ref.
@@ -104,7 +110,7 @@ jobs:
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
 
       # The chart is named after the plugin, so its name is read from Chart.yaml
       # instead of being hardcoded here: renaming the chart is then enough and

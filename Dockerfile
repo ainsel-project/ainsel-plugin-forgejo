@@ -22,7 +22,7 @@ RUN pnpm build
 
 # Stage 2: build the plugin binary with the bundle embedded. CGO off and a static
 # binary so it can run on the distroless base.
-FROM golang:1.26 AS build
+FROM golang:1.27 AS build
 
 WORKDIR /src
 

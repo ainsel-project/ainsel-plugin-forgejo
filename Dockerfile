@@ -3,7 +3,7 @@
 # Stage 1: build the UI bundle. The Go binary embeds ui/dist (see assets.go), so
 # the bundle has to exist before the Go build — and it has to be built here
 # rather than assumed present, because a fresh clone ships ui/dist empty.
-FROM node:24-bookworm AS ui
+FROM node:26-bookworm AS ui
 
 # Corepack picks the pnpm version from the package.json in the *working
 # directory* — the repo root has none, so running from /src would make it fall

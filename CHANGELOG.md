@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/ainsel-project/ainsel-plugin-forgejo/compare/v0.3.0...v0.3.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **#18:** shared FieldGrid/CardGrid align fields on a fixed grid ([#21](https://github.com/ainsel-project/ainsel-plugin-forgejo/issues/21)) ([cf5b23d](https://github.com/ainsel-project/ainsel-plugin-forgejo/commit/cf5b23d60da69f41091f8a447c9ea36d1ed00eb6))
+* **#20:** single-source every version string through release-please ([#23](https://github.com/ainsel-project/ainsel-plugin-forgejo/issues/23)) ([7232c5a](https://github.com/ainsel-project/ainsel-plugin-forgejo/commit/7232c5a1c7399126e983ad3bbbea518fc237c698))
+
 ## [0.3.0](https://github.com/ainsel-project/ainsel-plugin-forgejo/compare/v0.2.0...v0.3.0) (2026-11-22)
 
 

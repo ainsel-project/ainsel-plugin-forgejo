@@ -127,7 +127,7 @@ and the hub within one another's API level.
 
 | Plugin version | Plugin API (`pluginApi`) | AInsel platform |
 | --- | --- | --- |
-| 0.1.0 – 0.3.0 (every release so far) | 1.1 | a hub serving the Plugin API 1.1 contract |
+| 0.3.1 – 0.3.0 (every release so far) | 1.1 | a hub serving the Plugin API 1.1 contract |
 
 <!-- x-release-please-end -->
 
@@ -144,7 +144,7 @@ Install with a pinned image digest (required; mutable tags are rejected):
 <!-- x-release-please-start-version -->
 ```bash
 helm install forgejo oci://ghcr.io/ainsel-project/charts/forgejo \
-  --version 0.3.0 \
+  --version 0.3.1 \
   --set image.repository=ghcr.io/ainsel-project/ainsel-plugin-forgejo \
   --set image.digest=sha256:…
 ```

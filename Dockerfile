@@ -3,19 +3,20 @@
 # Stage 1: build the UI bundle. The Go binary embeds ui/dist (see assets.go), so
 # the bundle has to exist before the Go build — and it has to be built here
 # rather than assumed present, because a fresh clone ships ui/dist empty.
-FROM node:24-bookworm AS ui
+FROM node:26-bookworm AS ui
 
-# Corepack picks the pnpm version from the package.json in the *working
-# directory* — the repo root has none, so running from /src would make it fall
-# back to the latest pnpm and fail against ui/package.json's packageManager
-# pin (pnpm@9.15.9). Work inside the ui directory so the pin is honoured. The
-# download prompt is turned off so a first build never blocks waiting for a tty.
+# Node 24 shipped corepack, which picked the pnpm version from the package.json
+# in the *working directory*; Node 26 no longer bundles corepack in the image.
+# So the pin (pnpm@9.15.9) is read straight out of ui/package.json and that
+# exact pnpm is installed with npm — one source of truth, and no interactive
+# download prompt to disable because there is no corepack to prompt.
 WORKDIR /src/ui
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 # Manifest and lockfile first, so dependency install is cached across source edits.
 COPY ui/package.json ui/pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1]") \
+ && npm install --global "pnpm@${PNPM_VERSION}" \
+ && pnpm install --frozen-lockfile
 
 COPY ui/ ./
 RUN pnpm build

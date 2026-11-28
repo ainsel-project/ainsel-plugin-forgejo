@@ -11,7 +11,9 @@ interface Trigger {
   name: string;
   agentRef: string;
   connectorRef: string;
-  filters: any[];
+  // The rule engine's filter objects: this step only counts triggers, never reads
+  // inside a filter, so the shape stays opaque here rather than being restated.
+  filters: unknown[];
 }
 
 interface Verdict {
@@ -51,14 +53,22 @@ const OP_COLUMNS = [
     header: "Name",
     cell: (row: OpRow) => <span style={{ fontFamily: MONO_FONT, color: "var(--ink)" }}>{row.name}</span>,
   },
-  { key: "detail", header: "Detail", cell: (row: OpRow) => <span style={{ color: "var(--ink-2)" }}>{row.detail}</span> },
+  {
+    key: "detail",
+    header: "Detail",
+    cell: (row: OpRow) => <span style={{ color: "var(--ink-2)" }}>{row.detail}</span>,
+  },
 ];
 
 // The trigger table's columns. The agent cell shows the agent by name: the plan names it by
 // id (empty for an agent the apply has yet to create), which reads as noise to an admin.
 function triggerColumns(agentLabel: (trig: Trigger) => string) {
   return [
-    { key: "name", header: "Trigger", cell: (trig: Trigger) => <span style={{ fontFamily: MONO_FONT }}>{trig.name}</span> },
+    {
+      key: "name",
+      header: "Trigger",
+      cell: (trig: Trigger) => <span style={{ fontFamily: MONO_FONT }}>{trig.name}</span>,
+    },
     { key: "agent", header: "Agent", cell: (trig: Trigger) => <span>{agentLabel(trig)}</span> },
   ];
 }
@@ -156,12 +166,7 @@ export function Preview({ plan, applying = false, onApply, onBack, agentLabel }:
       {/* Apply stays on the screen while the plan blocks it, out of reach: the admin sees the
           button the plan will enable, and the blocking lines say what to fix to get there. */}
       <StepFooter onBack={onBack}>
-        <Button
-          variant="primary"
-          onClick={onApply}
-          disabled={hasBlocking || applying}
-          className="forgejo-apply-btn"
-        >
+        <Button variant="primary" onClick={onApply} disabled={hasBlocking || applying} className="forgejo-apply-btn">
           {applying ? "Applying…" : `Apply ${plural(total, "change")}`}
         </Button>
       </StepFooter>

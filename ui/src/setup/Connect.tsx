@@ -2,6 +2,7 @@ import { Button, Notice } from "@ainsel/plugin-sdk";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { usePluginContext } from "@ainsel/plugin-sdk";
+import { asApiError } from "../api";
 import { StepFooter } from "./Wizard";
 
 // How long to wait for Forgejo to deliver the test event, and how often to ask.
@@ -48,6 +49,7 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
   useEffect(() => {
     const startedAt = Date.now();
     let cancelled = false;
+    // eslint-disable-next-line prefer-const -- `let`, not `const`: the first pollDeliveries() runs before the assignment below, and its timeout path calls stop(), which reads `timer`. A const would TDZ-crash there.
     let timer: ReturnType<typeof setInterval> | undefined;
 
     const stop = () => {
@@ -66,10 +68,9 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
       }
 
       try {
-        const response = (await api.get(
-          `/setup/installs/${install.slug}/deliveries`,
-          { query: { since: new Date(startedAt).toISOString() } },
-        )) as { verified: boolean; at: string | null };
+        const response = (await api.get(`/setup/installs/${install.slug}/deliveries`, {
+          query: { since: new Date(startedAt).toISOString() },
+        })) as { verified: boolean; at: string | null };
 
         if (cancelled) return;
         failures = 0;
@@ -79,13 +80,13 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
           setVerified(true);
           setVerificationTime(response.at);
         }
-      } catch (err: any) {
+      } catch (err) {
         // A poll that failed to answer is not an answer; the next one asks again. Three of them
         // in a row is worth the admin hearing, though — "polling" over a hub this screen cannot
         // reach is a wait that will not end on its own.
         failures += 1;
         if (failures >= 3) {
-          setPollError(err?.message || "The deliveries endpoint did not answer");
+          setPollError(asApiError(err).message || "The deliveries endpoint did not answer");
         }
       }
     };
@@ -120,9 +121,7 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
   if (timedOut) {
     return (
       <div className="forgejo-connect" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <Notice variant="warn">
-          No delivery detected after 60 seconds. Check the webhook status manually.
-        </Notice>
+        <Notice variant="warn">No delivery detected after 60 seconds. Check the webhook status manually.</Notice>
         <div className="forgejo-hint" style={{ fontSize: "0.8125rem", color: "var(--ink-2)" }}>
           <p>Recent Deliveries:</p>
           <p>
@@ -184,8 +183,8 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
           }}
         />
         <span>
-          <strong style={{ fontWeight: 600 }}>Waiting for the first event…</strong>{" "}
-          This turns green when Forgejo delivers a webhook to the install.
+          <strong style={{ fontWeight: 600 }}>Waiting for the first event…</strong> This turns green when Forgejo
+          delivers a webhook to the install.
         </span>
       </div>
 
@@ -196,35 +195,51 @@ export function Connect({ install, onDone, onBack }: ConnectProps) {
       {/* The checklist is what the admin does, in order. Forgejo offers its test-delivery button on
           repository hooks only (V10), so the one step the admin takes for an organization webhook
           is a real event. */}
-      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.625rem", fontSize: "0.875rem" }}>
+      <ol
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.625rem",
+          fontSize: "0.875rem",
+        }}
+      >
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("done")}>✓</span>
+          <span aria-hidden="true" style={checkNumStyle("done")}>
+            ✓
+          </span>
           <span style={{ color: "var(--ink-2)", paddingTop: "0.0625rem" }}>
             {`Organization webhook created on ${host}/${install.org}`}
           </span>
         </li>
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("current")}>2</span>
+          <span aria-hidden="true" style={checkNumStyle("current")}>
+            2
+          </span>
           <span style={{ color: "var(--ink-2)", paddingTop: "0.0625rem" }}>
             {`Send one event: open an issue, or comment on one, in any repository of ${install.org}.`}
           </span>
         </li>
         <li style={{ display: "flex", gap: "0.625rem", alignItems: "flex-start" }}>
-          <span aria-hidden="true" style={checkNumStyle("todo")}>3</span>
+          <span aria-hidden="true" style={checkNumStyle("todo")}>
+            3
+          </span>
           <span style={{ color: "var(--ink-3)", paddingTop: "0.0625rem" }}>First event received</span>
         </li>
       </ol>
 
       <div className="forgejo-hint" style={{ fontSize: "0.8125rem", color: "var(--ink-2)" }}>
         <p style={{ margin: 0 }}>
-          You can finish now. The install is complete. It is marked verified when the first event
-          arrives, and you can come back here from the installs list.
+          You can finish now. The install is complete. It is marked verified when the first event arrives, and you can
+          come back here from the installs list.
         </p>
         <p style={{ margin: "0.5rem 0 0" }}>
           <a href={hookUrl} target="_blank" rel="noopener noreferrer">
             Open the webhook settings
-          </a>
-          {" "}to see Recent Deliveries in Forgejo.
+          </a>{" "}
+          to see Recent Deliveries in Forgejo.
         </p>
       </div>
 
@@ -252,7 +267,9 @@ function checkNumStyle(state: "done" | "current" | "todo"): CSSProperties {
     fontSize: "0.6875rem",
     fontWeight: 600,
   };
-  if (state === "done") return { ...base, background: "var(--signal)", color: "var(--paper)", border: "1px solid var(--signal)" };
-  if (state === "current") return { ...base, background: "var(--paper)", color: "var(--signal)", border: "2px solid var(--signal)" };
+  if (state === "done")
+    return { ...base, background: "var(--signal)", color: "var(--paper)", border: "1px solid var(--signal)" };
+  if (state === "current")
+    return { ...base, background: "var(--paper)", color: "var(--signal)", border: "2px solid var(--signal)" };
   return { ...base, background: "var(--paper)", color: "var(--ink-3)", border: "1px solid var(--hair)" };
 }

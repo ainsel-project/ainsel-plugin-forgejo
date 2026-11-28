@@ -21,13 +21,7 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: [
-        "react",
-        "react-dom",
-        "react-dom/client",
-        "react/jsx-runtime",
-        "@ainsel/plugin-sdk",
-      ],
+      external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "@ainsel/plugin-sdk"],
     },
   },
   test: {

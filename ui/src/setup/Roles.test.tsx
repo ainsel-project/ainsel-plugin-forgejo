@@ -137,18 +137,17 @@ describe("Roles (S4)", () => {
     const { container } = renderRoles();
     for (const role of ["refiner", "developer", "reviewer"]) {
       const runtime = container.querySelector(`#roles-${role}-runtime`) as HTMLInputElement;
-      expect(container.querySelector(`label[for="roles-${role}-runtime"]`)?.textContent).toBe(
-        "Runtime image",
-      );
+      expect(container.querySelector(`label[for="roles-${role}-runtime"]`)?.textContent).toBe("Runtime image");
       expect(runtime).toBeTruthy();
-      expect(container.querySelector(`label[for="roles-${role}-agent-name"]`)?.textContent).toBe(
-        "Agent name",
-      );
+      expect(container.querySelector(`label[for="roles-${role}-agent-name"]`)?.textContent).toBe("Agent name");
     }
   });
 
   it("marks a role whose runtime is missing where its field is, once Continue is tried", () => {
-    const input = blankInput({ refiner: "registry.example.com/base:latest", reviewer: "registry.example.com/codex:latest" });
+    const input = blankInput({
+      refiner: "registry.example.com/base:latest",
+      reviewer: "registry.example.com/codex:latest",
+    });
     const { container } = renderRoles({ input });
     // Nothing is refused until the admin tries to move on.
     expect(container.querySelector('[data-variant="err"]')).toBeNull();
@@ -156,12 +155,8 @@ describe("Roles (S4)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(roleCard(container, "Developer").textContent).toContain(
-      "Enter a runtime container for this role.",
-    );
-    expect(roleCard(container, "Refiner").textContent).not.toContain(
-      "Enter a runtime container for this role.",
-    );
+    expect(roleCard(container, "Developer").textContent).toContain("Enter a runtime container for this role.");
+    expect(roleCard(container, "Refiner").textContent).not.toContain("Enter a runtime container for this role.");
   });
 
   it("stays on the step when Continue is clicked with runtimes missing", () => {
@@ -171,9 +166,7 @@ describe("Roles (S4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onNext).not.toHaveBeenCalled();
     // It says which roles, not only where to fill in.
-    expect(screen.getByRole("alert").textContent).toBe(
-      "Enter a runtime container for: developer, reviewer",
-    );
+    expect(screen.getByRole("alert").textContent).toBe("Enter a runtime container for: developer, reviewer");
   });
 
   it("names the missing runtimes together, in the order the preview lists them", () => {
@@ -235,15 +228,11 @@ describe("Roles (S4)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onNext).not.toHaveBeenCalled();
-    expect(roleCard(container, "Developer").textContent).toContain(
-      "Add a tag such as :8.0, or a @sha256: digest.",
-    );
+    expect(roleCard(container, "Developer").textContent).toContain("Add a tag such as :8.0, or a @sha256: digest.");
     // The role that did name a version is left alone — and it is not told the field
     // is empty, which it is not.
     expect(roleCard(container, "Refiner").textContent).not.toContain("Add a tag such as :8.0");
-    expect(roleCard(container, "Refiner").textContent).not.toContain(
-      "Enter a runtime container for this role.",
-    );
+    expect(roleCard(container, "Refiner").textContent).not.toContain("Enter a runtime container for this role.");
   });
 
   it("names every untagged runtime together, in the order the cards list them", () => {
@@ -297,9 +286,7 @@ describe("Roles (S4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onNext).not.toHaveBeenCalled();
     for (const role of ["Refiner", "Developer", "Reviewer"] as const) {
-      expect(roleCard(container, role).textContent).toContain(
-        "Add a tag such as :8.0, or a @sha256: digest.",
-      );
+      expect(roleCard(container, role).textContent).toContain("Add a tag such as :8.0, or a @sha256: digest.");
     }
     expect(screen.getByRole("alert").textContent).toContain("refiner, developer, reviewer");
   });
@@ -374,17 +361,14 @@ describe("Roles (S4)", () => {
     const shared = "registry.example.com/shared:latest";
     const input = blankInput({ refiner: shared, developer: shared, reviewer: shared });
     const { container } = renderRoles({ input });
-    const box = container.querySelector(
-      ".forgejo-use-for-all input[type=checkbox]",
-    ) as HTMLInputElement;
+    const box = container.querySelector(".forgejo-use-for-all input[type=checkbox]") as HTMLInputElement;
     expect(box.checked).toBe(true);
   });
 
   it("starts the tick off where the runtimes differ, and on nothing when they are all empty", () => {
     // Different runtimes: the tick is an offer, not a claim about the input.
     const { container } = renderRoles();
-    const box = () =>
-      container.querySelector(".forgejo-use-for-all input[type=checkbox]") as HTMLInputElement;
+    const box = () => container.querySelector(".forgejo-use-for-all input[type=checkbox]") as HTMLInputElement;
     expect(box().checked).toBe(false);
 
     // A brand-new walk: all three empty. Unticked — the tick marks a decision the
@@ -392,9 +376,7 @@ describe("Roles (S4)", () => {
     cleanup();
     const fresh = renderRoles({ input: blankInput({}) });
     expect(
-      (fresh.container.querySelector(
-        ".forgejo-use-for-all input[type=checkbox]",
-      ) as HTMLInputElement).checked,
+      (fresh.container.querySelector(".forgejo-use-for-all input[type=checkbox]") as HTMLInputElement).checked,
     ).toBe(false);
   });
 
@@ -539,9 +521,7 @@ describe("Roles (S4)", () => {
 
     expect(setInput).toHaveBeenCalledTimes(1);
     const next = setInput.mock.calls[0][0] as Input;
-    expect(next.roles.refiner.tools.sort()).toEqual(
-      ["forgejo_list_issues", "forgejo_update_issue"].sort(),
-    );
+    expect(next.roles.refiner.tools.sort()).toEqual(["forgejo_list_issues", "forgejo_update_issue"].sort());
 
     setInput.mockClear();
     fireEvent.click(bulkButtons(container, "Refiner")[1]);
@@ -662,9 +642,7 @@ describe("Roles (S4)", () => {
     fireEvent.click(reviewerCheckAll);
     expect(setInput).toHaveBeenCalledTimes(1);
     const next = setInput.mock.calls[0][0] as Input;
-    expect(next.roles.reviewer.tools.sort()).toEqual(
-      ["forgejo_list_issues", "forgejo_review_pr"].sort(),
-    );
+    expect(next.roles.reviewer.tools.sort()).toEqual(["forgejo_list_issues", "forgejo_review_pr"].sort());
     expect(next.roles.refiner.tools).toEqual(baseInput.roles.refiner.tools);
   });
 
@@ -772,10 +750,7 @@ describe("working hours", () => {
 
   // The walk's input with one role's window set — or cleared, which is what `undefined` is
   // here rather than a value to be skipped.
-  function inputWithHours(
-    role: "refiner" | "developer" | "reviewer",
-    hours?: Hours,
-  ): Input {
+  function inputWithHours(role: "refiner" | "developer" | "reviewer", hours?: Hours): Input {
     const next: Input = { ...baseInput, roles: { ...baseInput.roles } };
     next.roles[role] = { ...baseInput.roles[role], workingHours: hours };
     return next;
@@ -786,11 +761,7 @@ describe("working hours", () => {
 
   const hoursTick = (container: HTMLElement, role: "Refiner" | "Developer" | "Reviewer") =>
     hoursGroup(container, role).querySelector<HTMLInputElement>(".forgejo-hours-on")!;
-  const dayButton = (
-    container: HTMLElement,
-    role: "Refiner" | "Developer" | "Reviewer",
-    label: string,
-  ) =>
+  const dayButton = (container: HTMLElement, role: "Refiner" | "Developer" | "Reviewer", label: string) =>
     Array.from(hoursGroup(container, role).querySelectorAll<HTMLButtonElement>(".forgejo-hours-day")).find(
       (b) => b.textContent === label,
     )!;
@@ -809,9 +780,7 @@ describe("working hours", () => {
     expect(group.querySelector(".forgejo-hours-summary")).toBeNull();
     // And the screen says what leaving it alone means, because it is not the same nothing as a
     // window taken back off.
-    expect(group.querySelector(".forgejo-hours-none-hint")?.textContent).toContain(
-      "works around the clock",
-    );
+    expect(group.querySelector(".forgejo-hours-none-hint")?.textContent).toContain("works around the clock");
   });
 
   it("asks for a working week when the admin ticks the window on", () => {
@@ -886,18 +855,14 @@ describe("working hours", () => {
         end: "17:00",
       }),
     });
-    expect(container.querySelector(".forgejo-hours-summary")?.textContent).toBe(
-      "Mon–Fri 09:00–17:00 Europe/Berlin",
-    );
+    expect(container.querySelector(".forgejo-hours-summary")?.textContent).toBe("Mon–Fri 09:00–17:00 Europe/Berlin");
   });
 
   it("reads a night shift as the one window it is", () => {
     const { container } = renderRoles({
       input: inputWithHours("refiner", { timezone: "", days: [], start: "22:00", end: "06:00" }),
     });
-    expect(container.querySelector(".forgejo-hours-summary")?.textContent).toBe(
-      "every day 22:00–06:00 UTC",
-    );
+    expect(container.querySelector(".forgejo-hours-summary")?.textContent).toBe("every day 22:00–06:00 UTC");
   });
 
   it("keeps each role's window its own", () => {

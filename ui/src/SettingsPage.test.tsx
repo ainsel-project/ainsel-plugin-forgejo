@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SettingsPage } from "./SettingsPage";
 import { get, post, put } from "./testing/sdk";
-import type { Setting } from "./api";
+import { httpError } from "./testing/errors";
+import type { Setting, SettingsEdit } from "./api";
 
 const ROLES = ["refiner", "developer", "reviewer"];
 
@@ -74,10 +75,7 @@ const AUTH_METHOD_OPTIONS = [
 // one row by its "role.field" key — a dirty row, an older defaultVersion, and so on.
 // `extra` adds rows for fields the page has no card for, the way a newer plugin's
 // registry would answer.
-function makeSettings(
-  edits: Record<string, Partial<Setting>> = {},
-  extra: Setting[] = [],
-): Setting[] {
+function makeSettings(edits: Record<string, Partial<Setting>> = {}, extra: Setting[] = []): Setting[] {
   const rows: Setting[] = [];
   for (const role of ROLES) {
     for (const [field, value] of Object.entries(FIELD_VALUES)) {
@@ -103,18 +101,17 @@ function makeSettings(
 // carries what was saved, and a save is what makes a row dirty.
 function afterEdit(current: Setting[], role: string, field: string, value: string): Setting[] {
   return current.map((s) =>
-    s.role === role && s.field === field
-      ? { ...s, value, dirty: true, defaultVersion: RUNNING_VERSION }
-      : s,
+    s.role === role && s.field === field ? { ...s, value, dirty: true, defaultVersion: RUNNING_VERSION } : s,
   );
 }
 
 // The registry after a batch: every edit in the request, applied in order.
+// The batch body as the PUT sends it. `body` arrives at the mock as `unknown` —
+// the same contract the console's client keeps at runtime.
+const batchEdits = (body: unknown): SettingsEdit[] => (body as { settings: SettingsEdit[] }).settings;
+
 function afterBatch(current: Setting[], edits: { role: string; field: string; value?: string }[]) {
-  return edits.reduce(
-    (acc, e) => afterEdit(acc, e.role, e.field, e.value ?? ""),
-    current,
-  );
+  return edits.reduce((acc, e) => afterEdit(acc, e.role, e.field, e.value ?? ""), current);
 }
 
 function mockSettingsGet(edits: Record<string, Partial<Setting>> = {}, extra: Setting[] = []) {
@@ -181,9 +178,7 @@ describe("SettingsPage (the admin's cards)", () => {
 
     const select = screen.getByLabelText("Provider") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(
-      PROVIDER_OPTIONS.map((o) => o.value),
-    );
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(PROVIDER_OPTIONS.map((o) => o.value));
     expect(select.value).toBe("ollama-cloud");
     // The row next to it stays a free-text input: the dropdown is the answer's
     // call, not a per-field rule in the page.
@@ -197,10 +192,7 @@ describe("SettingsPage (the admin's cards)", () => {
       "refiner.llmProvider": {
         value: "legacy-cloud",
         dirty: true,
-        options: [
-          ...PROVIDER_OPTIONS,
-          { value: "legacy-cloud", label: "legacy-cloud (current, not in list)" },
-        ],
+        options: [...PROVIDER_OPTIONS, { value: "legacy-cloud", label: "legacy-cloud (current, not in list)" }],
       },
     });
     await renderLoaded();
@@ -231,16 +223,14 @@ describe("SettingsPage (the admin's cards)", () => {
 
     const select = screen.getByLabelText("OpenAI auth method") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(
-      AUTH_METHOD_OPTIONS.map((o) => o.value),
-    );
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(AUTH_METHOD_OPTIONS.map((o) => o.value));
     expect(select.value).toBe("APIKey");
   });
 
   it("sends the auth method as an ordinary row save", async () => {
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -261,18 +251,20 @@ describe("SettingsPage (the admin's cards)", () => {
     // row the admin has to change, keeping the draft.
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
-        fields: [
-          {
-            role: "refiner",
-            field: "llmOpenAIAuthMethod",
-            error: "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
-          },
-        ],
-      };
-      throw err;
+      throw httpError("bad request", {
+        status: 400,
+
+        body: {
+          fields: [
+            {
+              role: "refiner",
+              field: "llmOpenAIAuthMethod",
+              error:
+                "ChatGPT sign-in sends no API key (leave llmOpenAIKey empty to keep what the agents hold, or keep APIKey)",
+            },
+          ],
+        },
+      });
     });
     await renderLoaded();
 
@@ -283,9 +275,7 @@ describe("SettingsPage (the admin's cards)", () => {
     fireEvent.click(within(saveBar()).getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText(/ChatGPT sign-in sends no API key/)).toBeTruthy();
-    expect((screen.getByLabelText("OpenAI auth method") as HTMLSelectElement).value).toBe(
-      "ChatGPTSignIn",
-    );
+    expect((screen.getByLabelText("OpenAI auth method") as HTMLSelectElement).value).toBe("ChatGPTSignIn");
   });
 
   it("renders the custom pair in the Model card: the URL as text, the key as a write-only password", async () => {
@@ -324,8 +314,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // and the key save together, and the backend writes the key to the hub's
     // openAI block for the role's agent.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -360,8 +350,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // post-batch values, so the three edits belong in one save — and the page
     // already collects every typed draft into one PUT.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -392,8 +382,8 @@ describe("SettingsPage (the admin's cards)", () => {
       "refiner.llmCustomUrl": { value: "https://old.example.com/v1", dirty: true },
       "refiner.llmCustomKey": { value: "", dirty: true },
     });
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -403,10 +393,8 @@ describe("SettingsPage (the admin's cards)", () => {
     fireEvent.click(within(saveBar()).getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
-    const sent = (put.mock.calls[0][1] as any).settings;
-    expect(sent).toEqual([
-      { role: "refiner", field: "llmCustomUrl", value: "https://new.example.com/v1" },
-    ]);
+    const sent = (put.mock.calls[0][1] as { settings: SettingsEdit[] }).settings;
+    expect(sent).toEqual([{ role: "refiner", field: "llmCustomUrl", value: "https://new.example.com/v1" }]);
   });
 
   it("offers no reset on a key row, because there is nothing here to reset", async () => {
@@ -425,8 +413,8 @@ describe("SettingsPage (the admin's cards)", () => {
     // is a write onto the role's agents, and one of them refused it. Nothing
     // retries it: the plugin kept no copy to retry from, so the field says so.
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
       fields: [
         {
           role: "refiner",
@@ -449,18 +437,19 @@ describe("SettingsPage (the admin's cards)", () => {
     // the admin has to fill in, keeping the draft.
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
-        fields: [
-          {
-            role: "refiner",
-            field: "llmProvider",
-            error: "custom provider needs a URL (set llmCustomUrl in the same save)",
-          },
-        ],
-      };
-      throw err;
+      throw httpError("bad request", {
+        status: 400,
+
+        body: {
+          fields: [
+            {
+              role: "refiner",
+              field: "llmProvider",
+              error: "custom provider needs a URL (set llmCustomUrl in the same save)",
+            },
+          ],
+        },
+      });
     });
     await renderLoaded();
 
@@ -483,9 +472,9 @@ describe("SettingsPage (the admin's cards)", () => {
       defaultVersion: RUNNING_VERSION,
     }));
     mockSettingsGet({}, extra);
-    put.mockImplementation(async (_path: string, body: any) =>
-      ({ settings: afterBatch(makeSettings({}, extra), body.settings) }),
-    );
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings({}, extra), batchEdits(body)),
+    }));
     await renderLoaded();
 
     expect(screen.getByRole("heading", { name: "Other" })).toBeTruthy();
@@ -561,8 +550,8 @@ describe("SettingsPage (batch save)", () => {
   it("collects typed changes as drafts and sends them all in one PUT", async () => {
     const current = makeSettings();
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(current, body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(current, batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -597,8 +586,8 @@ describe("SettingsPage (batch save)", () => {
 
   it("sends a batch that spans roles in the same request", async () => {
     mockSettingsGet();
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings(), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings(), batchEdits(body)),
     }));
     await renderLoaded();
 
@@ -650,15 +639,16 @@ describe("SettingsPage (batch save)", () => {
     // named (the console's client puts the parsed body on the error).
     mockSettingsGet();
     put.mockImplementation(async () => {
-      const err: any = new Error("bad request");
-      err.status = 400;
-      err.body = {
-        fields: [
-          { role: "refiner", field: "llmModel", error: "model must not be empty" },
-          { role: "refiner", field: "mcpUrl", error: "not a URL" },
-        ],
-      };
-      throw err;
+      throw httpError("bad request", {
+        status: 400,
+
+        body: {
+          fields: [
+            { role: "refiner", field: "llmModel", error: "model must not be empty" },
+            { role: "refiner", field: "mcpUrl", error: "not a URL" },
+          ],
+        },
+      });
     });
     await renderLoaded();
 
@@ -722,7 +712,7 @@ describe("SettingsPage (reset and the winner rule)", () => {
     mockSettingsGet({
       "refiner.llmModel": { value: "edited-away", dirty: true, default: "llama3.3" },
     });
-    put.mockImplementation(async (path: string, body: any) => {
+    put.mockImplementation(async (path: string, body: unknown) => {
       expect(path).toBe("/settings");
       expect(body).toEqual({ settings: [{ role: "refiner", field: "llmModel", reset: true }] });
       return { settings: makeSettings() }; // the reset re-adopts the default
@@ -796,7 +786,7 @@ describe("SettingsPage (reset and the winner rule)", () => {
         defaultVersion: "0.0.9",
       },
     });
-    put.mockImplementation(async (_path: string, body: any) => {
+    put.mockImplementation(async (_path: string, body: unknown) => {
       expect(body).toEqual({ settings: [{ role: "refiner", field: "personaText", reset: true }] });
       return { settings: makeSettings() };
     });
@@ -952,9 +942,7 @@ describe("SettingsPage (Reconcile now)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
 
-    const notice = (await screen.findByText(/gone-model @spurious/)).closest(
-      '[data-testid="notice"]',
-    ) as HTMLElement;
+    const notice = (await screen.findByText(/gone-model @spurious/)).closest('[data-testid="notice"]') as HTMLElement;
     expect(notice.dataset.variant).toBe("warn");
     expect(notice.textContent).toContain("developer");
     expect(notice.textContent).toContain("unreachable");
@@ -988,9 +976,9 @@ describe("SettingsPage (Reconcile now)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reconcile now" }));
 
-    const notice = (
-      await screen.findByText(/cannot check: the hub would not answer/)
-    ).closest('[data-testid="notice"]') as HTMLElement;
+    const notice = (await screen.findByText(/cannot check: the hub would not answer/)).closest(
+      '[data-testid="notice"]',
+    ) as HTMLElement;
     expect(notice.dataset.variant).toBe("warn");
     expect(notice.textContent).toContain("unknown");
     expect(screen.queryByText("Checked: nothing to fix.")).toBeNull();
@@ -1036,9 +1024,7 @@ describe("SettingsPage (Reconcile now)", () => {
             },
           ],
           refused: [],
-          llmChecks: [
-            { role: "reviewer", provider: "ollama-cloud", model: "llama3.3", state: "ok" },
-          ],
+          llmChecks: [{ role: "reviewer", provider: "ollama-cloud", model: "llama3.3", state: "ok" }],
         };
       }
       throw new Error(`unexpected POST ${path}`);
@@ -1112,9 +1098,9 @@ describe("SettingsPage (Reconcile now)", () => {
 describe("SettingsPage (access)", () => {
   it("says only admins when the GET says only admins", async () => {
     get.mockImplementation(async () => {
-      const err: any = new Error("forbidden");
-      err.status = 403;
-      throw err;
+      throw httpError("forbidden", {
+        status: 403,
+      });
     });
     render(<SettingsPage />);
 
@@ -1209,8 +1195,8 @@ describe("SettingsPage (the PR patrol)", () => {
 
   it("saves a changed cadence as the developer's patrolInterval", async () => {
     mockSettingsGet({}, patrolRows());
-    put.mockImplementation(async (_path: string, body: any) => ({
-      settings: afterBatch(makeSettings({}, patrolRows()), body.settings),
+    put.mockImplementation(async (_path: string, body: unknown) => ({
+      settings: afterBatch(makeSettings({}, patrolRows()), batchEdits(body)),
     }));
     await renderLoaded();
     fireEvent.click(roleNav("Developer"));

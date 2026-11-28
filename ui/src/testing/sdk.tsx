@@ -20,21 +20,17 @@
 // hooks for finding a rendered primitive and reading its variant; the real
 // primitives carry neither.
 import { vi } from "vitest";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import type { HttpClient, PluginContextValue } from "@ainsel/plugin-sdk";
 
 // Mock API functions for work endpoints
-export const get = vi.fn<
-  (path: string, init?: { query?: Record<string, string> }) => Promise<any>
->();
+export const get = vi.fn<(path: string, init?: { query?: Record<string, string> }) => Promise<unknown>>();
 
-export const post = vi.fn<
-  (path: string, body?: unknown) => Promise<any>
->();
+export const post = vi.fn<(path: string, body?: unknown) => Promise<unknown>>();
 
 // The settings page writes through PUT — the console's client has it, so the
 // stand-in does too.
-export const put = vi.fn<(path: string, body?: unknown) => Promise<any>>();
+export const put = vi.fn<(path: string, body?: unknown) => Promise<unknown>>();
 
 // The context `usePluginContext` returns for plugin `forgejo`.
 const api = { get, post, put } as unknown as HttpClient;
@@ -55,11 +51,7 @@ export function usePluginContext(): PluginContextValue {
 // does not name — silently, in production. Here an unnamed prop throws, so a
 // component passing one (a `className` on `Notice`, say) fails its test instead
 // of quietly rendering nothing with it.
-function checkProps(
-  name: string,
-  props: object,
-  taken: readonly string[],
-): void {
+function checkProps(name: string, props: object, taken: readonly string[]): void {
   const extra = Object.keys(props).filter((prop) => !taken.includes(prop));
   if (extra.length > 0) {
     throw new Error(`${name} takes no ${extra.join(", ")} — the console drops it`);
@@ -70,14 +62,8 @@ function checkProps(
 // does not pass is as wrong as one it passes by mistake. Without this the mock fails where
 // the primitive would have failed — inside a `.map` over an undefined `tabs` — and the test
 // says nothing about which prop was missing.
-function requireProps(
-  name: string,
-  props: object,
-  required: readonly string[],
-): void {
-  const missing = required.filter(
-    (prop) => (props as Record<string, unknown>)[prop] === undefined,
-  );
+function requireProps(name: string, props: object, required: readonly string[]): void {
+  const missing = required.filter((prop) => (props as Record<string, unknown>)[prop] === undefined);
   if (missing.length > 0) {
     throw new Error(`${name} needs ${missing.join(", ")} — the console's primitive has no default for it`);
   }
@@ -200,7 +186,7 @@ export function Field(props: FieldProps) {
 type InputProps = {
   id?: string;
   value?: string;
-  onChange?: (e: any) => void;
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   type?: string;
   className?: string;
@@ -245,7 +231,17 @@ type SelectProps = {
 };
 
 export function Select(props: SelectProps) {
-  checkProps("Select", props, ["id", "value", "onChange", "options", "emptyLabel", "size", "disabled", "className", "aria-label"]);
+  checkProps("Select", props, [
+    "id",
+    "value",
+    "onChange",
+    "options",
+    "emptyLabel",
+    "size",
+    "disabled",
+    "className",
+    "aria-label",
+  ]);
   const { id, value, onChange, options, emptyLabel, disabled, className } = props;
   if (!Array.isArray(options)) {
     throw new Error("Select: options must be an array of { value, label }");
@@ -273,7 +269,7 @@ export function Select(props: SelectProps) {
 type TextareaProps = {
   id?: string;
   value?: string;
-  onChange?: (e: any) => void;
+  onChange?: (e: ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   className?: string;
 };
@@ -383,14 +379,7 @@ type RegisterTableProps<T> = {
 };
 
 export function RegisterTable<T>(props: RegisterTableProps<T>) {
-  checkProps("RegisterTable", props, [
-    "rows",
-    "columns",
-    "rowKey",
-    "emptyLabel",
-    "rowClassName",
-    "withRowNumbers",
-  ]);
+  checkProps("RegisterTable", props, ["rows", "columns", "rowKey", "emptyLabel", "rowClassName", "withRowNumbers"]);
   requireProps("RegisterTable", props, ["rows", "columns", "rowKey"]);
   const { rows, columns, rowKey, emptyLabel, rowClassName, withRowNumbers = true } = props;
   if (rows.length === 0 && emptyLabel !== undefined) {

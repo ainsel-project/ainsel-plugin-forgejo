@@ -1,0 +1,3 @@
+# Build output (only .gitkeep is tracked) and the lockfile.
+dist/
+pnpm-lock.yaml

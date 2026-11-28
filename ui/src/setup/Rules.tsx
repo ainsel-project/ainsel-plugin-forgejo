@@ -1,3 +1,4 @@
+import type { ChangeEvent } from "react";
 import { Button, Field, Input } from "@ainsel/plugin-sdk";
 import type { Input as InputType } from "./model";
 import { StepFooter } from "./Wizard";
@@ -10,12 +11,7 @@ interface RulesProps {
   onBack: () => void;
 }
 
-export function Rules({
-  input,
-  setInput,
-  onNext,
-  onBack,
-}: RulesProps) {
+export function Rules({ input, setInput, onNext, onBack }: RulesProps) {
   return (
     <div className="forgejo-rules" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       <FieldGrid>
@@ -27,7 +23,7 @@ export function Rules({
           <Input
             id="rules-exclude-label"
             value={input.excludeLabel}
-            onChange={(e: any) => setInput({ ...input, excludeLabel: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput({ ...input, excludeLabel: e.target.value })}
             placeholder="do-not-refine"
           />
         </Field>

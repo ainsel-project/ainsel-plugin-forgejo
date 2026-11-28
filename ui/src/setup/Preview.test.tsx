@@ -9,7 +9,7 @@ const planOf = (
     create: { kind: string; name: string; detail: string }[];
     change: { kind: string; name: string; detail: string }[];
     delete: { kind: string; name: string; detail: string }[];
-    triggers: { name: string; agentRef: string; connectorRef: string; filters: any[] }[];
+    triggers: { name: string; agentRef: string; connectorRef: string; filters: unknown[] }[];
     blocking: string[];
     warnings: string[];
   }>,
@@ -126,14 +126,9 @@ describe("Preview (S6)", () => {
     const tables = Array.from(container.querySelectorAll('[data-testid="register-table"]'));
     expect(tables).toHaveLength(2);
     const triggers = tables[1];
-    expect(Array.from(triggers.querySelectorAll("thead th")).map((th) => th.textContent)).toEqual([
-      "Trigger",
-      "Agent",
-    ]);
+    expect(Array.from(triggers.querySelectorAll("thead th")).map((th) => th.textContent)).toEqual(["Trigger", "Agent"]);
     expect(
-      Array.from(triggers.querySelectorAll("tbody tr")).map(
-        (tr) => tr.querySelector("td:nth-child(1)")?.textContent,
-      ),
+      Array.from(triggers.querySelectorAll("tbody tr")).map((tr) => tr.querySelector("td:nth-child(1)")?.textContent),
     ).toEqual(["forgejo-refiner-push-apps"]);
   });
 
@@ -174,9 +169,7 @@ describe("Preview (S6)", () => {
     // duration of the call and says what it is waiting for.
     const plan = planOf({ create: [{ kind: "user", name: "refiner-apps", detail: "" }] });
 
-    const { container } = render(
-      <Preview plan={plan} applying onApply={vi.fn()} onBack={vi.fn()} />
-    );
+    const { container } = render(<Preview plan={plan} applying onApply={vi.fn()} onBack={vi.fn()} />);
 
     const applyBtn = applyButton(container);
     expect(applyBtn, "the button says it is applying").toBeTruthy();
@@ -201,7 +194,9 @@ describe("Preview agent names", () => {
 
   it("names a trigger's agent through agentLabel, not by its hub id", () => {
     const plan = planOf({
-      triggers: [{ name: "forgejo-refiner-issue-opened-demo", agentRef: "a-5950e4c3", connectorRef: "c-1", filters: [] }],
+      triggers: [
+        { name: "forgejo-refiner-issue-opened-demo", agentRef: "a-5950e4c3", connectorRef: "c-1", filters: [] },
+      ],
     });
     render(<Preview plan={plan} onApply={vi.fn()} onBack={vi.fn()} agentLabel={() => "Refiner of demo"} />);
     expect(screen.getByText("Refiner of demo")).toBeTruthy();

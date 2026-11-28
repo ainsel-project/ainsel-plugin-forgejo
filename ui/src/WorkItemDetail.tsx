@@ -85,12 +85,7 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
         >
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
             {kindLabel} ·{" "}
-            <a
-              href={repoUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="forgejo-repo-link"
-            >
+            <a href={repoUrl} target="_blank" rel="noreferrer" className="forgejo-repo-link">
               {item.subject.repo}
             </a>{" "}
             <span className="forgejo-mono" style={MONO}>
@@ -107,19 +102,14 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
             <CloseIcon />
           </button>
         </div>
-        <h3
-          className="forgejo-detail-title"
-          style={{ margin: 0, fontSize: 17, lineHeight: "24px", fontWeight: 600 }}
-        >
+        <h3 className="forgejo-detail-title" style={{ margin: 0, fontSize: 17, lineHeight: "24px", fontWeight: 600 }}>
           {item.subject.title || number}
         </h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {threadNewest === null ? (
             <Tag variant="stale">No runs</Tag>
           ) : (
-            <Tag variant={statusTone(threadNewest.status)}>
-              {statusLabel(threadNewest.status)}
-            </Tag>
+            <Tag variant={statusTone(threadNewest.status)}>{statusLabel(threadNewest.status)}</Tag>
           )}
           <a
             href={item.url}
@@ -142,20 +132,11 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
       >
         <Card label="Cost" value={formatCost(totals.costUsd, totals.costKnown)} />
         <Card label="Agent time" value={formatDuration(totals.durationMs)} />
-        <Card
-          label="Runs"
-          value={
-            active > 0
-              ? `${totals.runs} (${active} active)`
-              : String(totals.runs)
-          }
-        />
+        <Card label="Runs" value={active > 0 ? `${totals.runs} (${active} active)` : String(totals.runs)} />
         <Card
           label="Updated"
           value={
-            <span title={new Date(item.lastActivity).toLocaleString()}>
-              {formatRelative(item.lastActivity, now)}
-            </span>
+            <span title={new Date(item.lastActivity).toLocaleString()}>{formatRelative(item.lastActivity, now)}</span>
           }
         />
       </CardGrid>
@@ -193,9 +174,7 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
           Run history
         </h4>
         {item.runs.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 13, color: "var(--ink-3)" }}>
-            No runs of their own
-          </p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ink-3)" }}>No runs of their own</p>
         ) : (
           // Newest first, as the response orders the runs. The list is an ordered list because
           // the order is the story: each run is the one the hand-off took after the one above.
@@ -204,12 +183,7 @@ export function WorkItemDetail({ item, repoUrl, onClose, onOpenItem }: Props) {
             style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}
           >
             {item.runs.map((run, index) => (
-              <RunStep
-                key={run.id}
-                run={run}
-                now={now}
-                last={index === item.runs.length - 1}
-              />
+              <RunStep key={run.id} run={run} now={now} last={index === item.runs.length - 1} />
             ))}
           </ol>
         )}
@@ -357,7 +331,10 @@ function Card({ label, value }: { label: string; value: ReactNode }) {
       }}
     >
       <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{label}</span>
-      <span className="forgejo-card-value" style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+      <span
+        className="forgejo-card-value"
+        style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+      >
         {value}
       </span>
     </div>
@@ -366,7 +343,16 @@ function Card({ label, value }: { label: string; value: ReactNode }) {
 
 function CloseIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   );

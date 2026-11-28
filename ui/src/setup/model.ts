@@ -106,13 +106,7 @@ export function daysText(days: number[]): string {
 export function workingHoursText(w: WorkingHours | undefined): string {
   if (!w) return "";
   const bounds =
-    w.start && w.end
-      ? `${w.start}–${w.end}`
-      : w.start
-        ? `from ${w.start}`
-        : w.end
-          ? `until ${w.end}`
-          : "all day";
+    w.start && w.end ? `${w.start}–${w.end}` : w.start ? `from ${w.start}` : w.end ? `until ${w.end}` : "all day";
   return `${daysText(w.days)} ${bounds} ${w.timezone || "UTC"}`;
 }
 

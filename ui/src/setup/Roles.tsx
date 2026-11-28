@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
 import { Button, Field, Input, Notice } from "@ainsel/plugin-sdk";
 import type { RoleToolSets } from "../api";
 import type { Input as InputType, RoleInput, WorkingHours } from "./model";
@@ -55,8 +55,7 @@ function runtimeHasVersion(ref: string): boolean {
 // What to say about a ref that floats, at the field and in the line naming all of
 // them at once. Both forms the fix accepts are named, because either one is enough.
 const RUNTIME_VERSION_ERROR = "Add a tag such as :8.0, or a @sha256: digest.";
-const RUNTIME_VERSION_SUMMARY =
-  "Add a tag such as :8.0, or a @sha256: digest, to the runtime for:";
+const RUNTIME_VERSION_SUMMARY = "Add a tag such as :8.0, or a @sha256: digest, to the runtime for:";
 
 // The look of one tool chip. A granted tool is ticked in the ok colour; a forbidden one that is
 // not granted is dashed and struck through, and it is the one that cannot be selected.
@@ -111,9 +110,7 @@ function dayChipStyle(checked: boolean): CSSProperties {
     cursor: "pointer",
     background: checked ? "color-mix(in srgb, var(--signal) 10%, transparent)" : "var(--paper)",
     color: checked ? "var(--signal)" : "var(--ink-3)",
-    border: checked
-      ? "1px solid color-mix(in srgb, var(--signal) 40%, transparent)"
-      : "1px solid var(--rule-soft)",
+    border: checked ? "1px solid color-mix(in srgb, var(--signal) 40%, transparent)" : "1px solid var(--rule-soft)",
   };
 }
 
@@ -143,9 +140,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
   // The roles with no runtime, in the order the cards and the preview list them.
   // An edit may leave them all empty — "keep what the install has" is a valid
   // answer there, and the plan honours it — so on an edit nothing is missing.
-  const missingRuntimes = editing
-    ? []
-    : ROLE_KEYS.filter((role) => input.roles[role].runtime === "");
+  const missingRuntimes = editing ? [] : ROLE_KEYS.filter((role) => input.roles[role].runtime === "");
 
   // The roles whose runtime names no version, in the order the cards and the preview
   // list them. An empty field is not one of them: on an edit empty means "keep what
@@ -230,10 +225,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
   // not removing, and a checked forbidden chip exists precisely so the admin can
   // take it away. Each is one handleRoleChange, keeping the one-setInput-per-
   // interaction convention.
-  const handleToolSelectAll = (
-    role: RoleKey,
-    choices: { tool: string; addable: boolean }[],
-  ) => {
+  const handleToolSelectAll = (role: RoleKey, choices: { tool: string; addable: boolean }[]) => {
     const current = input.roles[role].tools;
     const addable = choices.filter((c) => c.addable).map((c) => c.tool);
     // Merge, don't replace: tools the role already holds (offered or not) stay checked.
@@ -288,21 +280,27 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
           background: "var(--paper)",
         }}
       >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontWeight: 600, fontSize: "0.875rem" }}>
-          <span style={{ width: "0.625rem", height: "0.625rem", borderRadius: "999px", background: ROLE_COLOR[role], display: "inline-block" }} />
+        <span
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontWeight: 600, fontSize: "0.875rem" }}
+        >
+          <span
+            style={{
+              width: "0.625rem",
+              height: "0.625rem",
+              borderRadius: "999px",
+              background: ROLE_COLOR[role],
+              display: "inline-block",
+            }}
+          />
           {roleLabel(role)}
         </span>
 
         <FieldGrid>
-          <Field
-            htmlFor={`roles-${role}-agent-name`}
-            label="Agent name"
-            hint="The agent's display name in AInsel."
-          >
+          <Field htmlFor={`roles-${role}-agent-name`} label="Agent name" hint="The agent's display name in AInsel.">
             <Input
               id={`roles-${role}-agent-name`}
               value={roleData.agentName}
-              onChange={(e: any) => handleRoleChange(role, { agentName: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { agentName: e.target.value })}
               placeholder={`forgejo-${role}-${input.slug}`}
             />
           </Field>
@@ -327,7 +325,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             <Input
               id={`roles-${role}-runtime`}
               value={roleData.runtime}
-              onChange={(e: any) => handleRoleChange(role, { runtime: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { runtime: e.target.value })}
               placeholder="registry.example.com/image:tag"
             />
           </Field>
@@ -349,7 +347,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
             <Input
               id={`roles-${role}-turn-timeout`}
               value={turnTimeoutMinutesFromMs(roleData.turnTimeoutMs)}
-              onChange={(e: any) =>
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 handleRoleChange(role, { turnTimeoutMs: turnTimeoutMsFromMinutes(e.target.value) })
               }
               placeholder={turnTimeoutMinutesFromMs(TURN_TIMEOUT_DEFAULT_MS[role])}
@@ -371,7 +369,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               id={`roles-${role}-llm-key`}
               type="password"
               value={roleData.llmKey ?? ""}
-              onChange={(e: any) => handleRoleChange(role, { llmKey: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleRoleChange(role, { llmKey: e.target.value })}
               placeholder="(unchanged)"
             />
           </Field>
@@ -390,13 +388,19 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
         >
           <label
             className="forgejo-hours-toggle"
-            style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8125rem", color: "var(--ink-2)" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              fontSize: "0.8125rem",
+              color: "var(--ink-2)",
+            }}
           >
             <input
               className="forgejo-hours-on"
               type="checkbox"
               checked={roleData.workingHours !== undefined}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 handleRoleChange(role, {
                   workingHours: e.target.checked ? newWorkingHours() : undefined,
                 })
@@ -439,7 +443,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                     id={`roles-${role}-hours-start`}
                     type="time"
                     value={roleData.workingHours.start}
-                    onChange={(e: any) => handleHoursField(role, { start: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleHoursField(role, { start: e.target.value })}
                     placeholder="09:00"
                   />
                 </Field>
@@ -452,7 +456,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                     id={`roles-${role}-hours-end`}
                     type="time"
                     value={roleData.workingHours.end}
-                    onChange={(e: any) => handleHoursField(role, { end: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleHoursField(role, { end: e.target.value })}
                     placeholder="17:00"
                   />
                 </Field>
@@ -464,7 +468,9 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                   <Input
                     id={`roles-${role}-hours-tz`}
                     value={roleData.workingHours.timezone}
-                    onChange={(e: any) => handleHoursField(role, { timezone: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      handleHoursField(role, { timezone: e.target.value })
+                    }
                     placeholder="UTC"
                   />
                 </Field>
@@ -486,33 +492,28 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
               admin set in the AInsel console stays where they set it; a ticked-then-unticked role
               sends the clear, and the hub removes it. */}
           {roleData.workingHours === undefined && (
-            <p
-              className="forgejo-hours-none-hint"
-              style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink-3)" }}
-            >
-              Left unticked, the agent works around the clock, and a window set in the AInsel
-              console stays where it was set.
+            <p className="forgejo-hours-none-hint" style={{ margin: 0, fontSize: "0.75rem", color: "var(--ink-3)" }}>
+              Left unticked, the agent works around the clock, and a window set in the AInsel console stays where it was
+              set.
             </p>
           )}
         </div>
 
         {/* A tool list is a group of toggles, so it is marked up as the group it is: the label
             names the set, not a member of it. */}
-        <div role="group" aria-label={`${roleLabel(role)} tools`} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div
+          role="group"
+          aria-label={`${roleLabel(role)} tools`}
+          style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+        >
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)" }}>Tools</span>
             {choices.length > 0 && (
               <span style={{ marginLeft: "auto", display: "inline-flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                <Button
-                  onClick={() => handleToolSelectAll(role, choices)}
-                  disabled={allAddableChecked}
-                >
+                <Button onClick={() => handleToolSelectAll(role, choices)} disabled={allAddableChecked}>
                   Check all
                 </Button>
-                <Button
-                  onClick={() => handleToolClearAll(role)}
-                  disabled={roleData.tools.length === 0}
-                >
+                <Button onClick={() => handleToolClearAll(role)} disabled={roleData.tools.length === 0}>
                   Uncheck all
                 </Button>
               </span>
@@ -520,7 +521,10 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
           </div>
           {/* A role's tool list can run long; the chips wrap and the list scrolls rather than
               pushing the rest of the step off the screen. */}
-          <div className="forgejo-tools-scroll" style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", maxHeight: "16rem", overflowY: "auto" }}>
+          <div
+            className="forgejo-tools-scroll"
+            style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", maxHeight: "16rem", overflowY: "auto" }}
+          >
             {choices.map(({ tool, addable }) => {
               const checked = roleData.tools.includes(tool);
               // A tool the rails forbid stays out of reach while the role does not have it. If
@@ -540,7 +544,13 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
                   style={chipStyle(checked, addable)}
                 >
                   <span aria-hidden="true">{checked ? "✓" : addable ? "+" : "⊘"}</span>
-                  <span style={{ fontFamily: MONO_FONT, fontSize: "0.6875rem", textDecoration: disabled ? "line-through" : undefined }}>
+                  <span
+                    style={{
+                      fontFamily: MONO_FONT,
+                      fontSize: "0.6875rem",
+                      textDecoration: disabled ? "line-through" : undefined,
+                    }}
+                  >
                     {tool}
                   </span>
                 </button>
@@ -559,7 +569,16 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
 
   return (
     <div className="forgejo-roles" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <label className="forgejo-use-for-all" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8125rem", color: "var(--ink-2)" }}>
+      <label
+        className="forgejo-use-for-all"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          fontSize: "0.8125rem",
+          color: "var(--ink-2)",
+        }}
+      >
         <input
           type="checkbox"
           checked={useForAll}
@@ -580,9 +599,7 @@ export function Roles({ input, setInput, tools, editing, onNext, onBack }: Roles
       </p>
 
       {showMissing && missingRuntimes.length > 0 && (
-        <Notice variant="err">
-          Enter a runtime container for: {missingRuntimes.join(", ")}
-        </Notice>
+        <Notice variant="err">Enter a runtime container for: {missingRuntimes.join(", ")}</Notice>
       )}
 
       {showMissing && untaggedRuntimes.length > 0 && (

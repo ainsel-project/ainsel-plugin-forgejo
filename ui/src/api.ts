@@ -4,6 +4,25 @@
 
 import type { HttpClient } from "@ainsel/plugin-sdk";
 
+// The console's HTTP client rejects with an Error that also carries the HTTP
+// `status` and, when the response body parsed as JSON, that body (the parsed
+// apply report rides along on `report` for the routes that attach it there).
+// A catch parameter is `unknown` in strict TypeScript, so every handler that
+// reads one of these goes through this accessor instead of annotating the
+// parameter `any` — the shape the client actually answers, in one place.
+export interface ApiError {
+  status?: number;
+  body?: Record<string, unknown>;
+  report?: unknown;
+  message?: string;
+}
+
+// Reads a thrown value as the shape above. Never throws: a value that is not
+// an Error still answers, with only the fields it happens to carry.
+export function asApiError(err: unknown): ApiError {
+  return (err ?? {}) as ApiError;
+}
+
 // Group is one of the caller's groups as the hub resolved it.
 export interface Group {
   id: string;
@@ -86,7 +105,10 @@ export interface InvocationResponse {
 
 // WorkApi is the slice of the SDK's HttpClient the UI uses for work endpoints.
 export interface WorkApi {
-  get(path: string, init?: { query?: Record<string, string> }): Promise<WorkResponse | NowResponse | ItemResponse | InvocationResponse>;
+  get(
+    path: string,
+    init?: { query?: Record<string, string> },
+  ): Promise<WorkResponse | NowResponse | ItemResponse | InvocationResponse>;
 }
 
 // Setup API types
@@ -127,7 +149,7 @@ export interface SetupOptions {
 }
 
 export interface SetupInstalls {
-  installs: Array<any>;
+  installs: Install[];
 }
 
 // WorkingHours is the window an agent works in, in the shape the AInsel hub's agent spec
@@ -401,10 +423,7 @@ export function fetchInstances(api: HttpClient): Promise<InstancesResponse> {
 // putInstances replaces the whole list. Like the settings PUT, a refused write
 // names each bad row on the error's body and changes nothing; on success the
 // answer is the stored list, with the addresses already normalized.
-export function putInstances(
-  api: HttpClient,
-  instances: ForgejoInstance[],
-): Promise<InstancesResponse> {
+export function putInstances(api: HttpClient, instances: ForgejoInstance[]): Promise<InstancesResponse> {
   return api.put<InstancesResponse>("/instances", { instances });
 }
 

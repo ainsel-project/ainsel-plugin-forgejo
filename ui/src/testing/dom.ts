@@ -3,10 +3,7 @@
 // accessible name for a screen reader working through the form, and clicking the label does
 // nothing. It is also invisible to a test that finds a control by its label. So it is worth
 // checking a screen whole, after the click that renders it, rather than field by field.
-export function assertEveryLabelPointsAtItsControl(
-  screenName: string,
-  container: HTMLElement,
-): void {
+export function assertEveryLabelPointsAtItsControl(screenName: string, container: HTMLElement): void {
   const labels = Array.from(container.querySelectorAll("label[for]"));
   const dangling = labels.filter((label) => {
     const id = label.getAttribute("for");

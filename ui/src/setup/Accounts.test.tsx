@@ -30,15 +30,7 @@ function renderAccounts(
   }
 
   const onNext = vi.fn();
-  render(
-    <Accounts
-      input={input}
-      setInput={vi.fn()}
-      editing={props.editing}
-      onNext={onNext}
-      onBack={vi.fn()}
-    />,
-  );
+  render(<Accounts input={input} setInput={vi.fn()} editing={props.editing} onNext={onNext} onBack={vi.fn()} />);
   return { onNext };
 }
 

@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { Installs } from "./Installs";
 import { post } from "../testing/sdk";
+import { httpError } from "../testing/errors";
+import type { Install } from "../api";
 
 describe("Installs (S0)", () => {
   afterEach(() => {
@@ -33,11 +35,11 @@ describe("Installs (S0)", () => {
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
     // Should render the install list
-    expect(container.querySelector('.forgejo-installs')).toBeTruthy();
+    expect(container.querySelector(".forgejo-installs")).toBeTruthy();
     expect(container.textContent).toContain("apps");
   });
 
@@ -63,11 +65,11 @@ describe("Installs (S0)", () => {
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
     // Should have a remove button
-    const removeBtn = container.querySelector('.forgejo-remove-btn');
+    const removeBtn = container.querySelector(".forgejo-remove-btn");
     expect(removeBtn).toBeTruthy();
   });
 
@@ -109,9 +111,7 @@ describe("Installs (S0)", () => {
     );
 
     await user.click(container.querySelector(".forgejo-remove-btn") as HTMLButtonElement);
-    const confirm = container.querySelector(
-      ".forgejo-confirm-remove-btn",
-    ) as HTMLButtonElement;
+    const confirm = container.querySelector(".forgejo-confirm-remove-btn") as HTMLButtonElement;
     expect(confirm).toBeTruthy();
 
     await user.click(confirm);
@@ -215,10 +215,10 @@ describe("Installs (S0)", () => {
         onEditInstall={onEditInstall}
         onConnectInstall={vi.fn()}
         onRemoveInstall={vi.fn()}
-      />
+      />,
     );
 
-    const editBtn = container.querySelector('.forgejo-edit-btn');
+    const editBtn = container.querySelector(".forgejo-edit-btn");
     expect(editBtn).toBeTruthy();
     await user.click(editBtn!);
     expect(onEditInstall).toHaveBeenCalledWith("apps");
@@ -273,10 +273,12 @@ describe("Installs (S0)", () => {
     },
   };
 
-  const renderInstalls = (installs: any[]) =>
+  // Partial<Install>: each fixture spells out only the fields its assertions are
+  // about; the component reads nothing else off the rest.
+  const renderInstalls = (installs: Partial<Install>[]) =>
     render(
       <Installs
-        installs={installs}
+        installs={installs as Install[]}
         onNewInstall={vi.fn()}
         onEditInstall={vi.fn()}
         onConnectInstall={vi.fn()}
@@ -489,9 +491,9 @@ describe("Installs (S0)", () => {
 
   it("a refused plan names the refusal and leaves no delete behind", async () => {
     post.mockImplementation(async () => {
-      const err: any = new Error("adminToken is required");
-      err.status = 400;
-      throw err;
+      throw httpError("adminToken is required", {
+        status: 400,
+      });
     });
 
     const { container } = renderSweep();

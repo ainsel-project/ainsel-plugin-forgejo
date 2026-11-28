@@ -45,17 +45,10 @@ export function ForgejoAgentPanel({ agentName }: ForgejoAgentPanelProps) {
       ) : (
         items.map((item) => (
           <div key={`${item.subject.number}`} className="forgejo-item">
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="forgejo-item-link"
-            >
+            <a href={item.url} target="_blank" rel="noreferrer" className="forgejo-item-link">
               {item.subject.kind}/{item.subject.number}
             </a>
-            {item.subject.title && (
-              <span className="forgejo-item-title">{item.subject.title}</span>
-            )}
+            {item.subject.title && <span className="forgejo-item-title">{item.subject.title}</span>}
           </div>
         ))
       )}

@@ -68,6 +68,10 @@ function tracksOf(grid: HTMLElement): string {
   return grid.getAttribute("style") ?? "";
 }
 
+// Track assertions match `minmax(0` and `minmax(0px` alike: jsdom 31's new CSS serializer
+// normalizes the unitless zero we emit in layout.tsx to `0px`, where browsers and older
+// jsdom keep it as written. Either serialization is the same declared track.
+
 describe("columnsForWidth", () => {
   it("maps container widths to a fixed column count at the breakpoints and their edges", () => {
     expect(columnsForWidth(1)).toBe(1);
@@ -130,11 +134,11 @@ describe("FieldGrid", () => {
     expect(ro).toBeDefined();
 
     ro.fire(500);
-    expect(tracksOf(grid)).toContain("repeat(1, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(1, minmax\(0(px)?, 1fr\)/);
     ro.fire(700);
-    expect(tracksOf(grid)).toContain("repeat(2, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(2, minmax\(0(px)?, 1fr\)/);
     ro.fire(1200);
-    expect(tracksOf(grid)).toContain("repeat(3, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(3, minmax\(0(px)?, 1fr\)/);
     expect(tracksOf(grid)).not.toContain("auto-fit");
   });
 
@@ -156,9 +160,9 @@ describe("FieldGrid", () => {
     const grid = gridOf(container, ".ainsel-field-grid");
     const ro = observed[0];
     ro.fire(1200);
-    expect(tracksOf(grid)).toContain("repeat(3, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(3, minmax\(0(px)?, 1fr\)/);
     ro.fire(0);
-    expect(tracksOf(grid)).toContain("repeat(3, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(3, minmax\(0(px)?, 1fr\)/);
   });
 });
 
@@ -180,11 +184,11 @@ describe("CardGrid", () => {
 
     const ro = observed[0];
     ro.fire(150);
-    expect(tracksOf(grid)).toContain("repeat(1, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(1, minmax\(0(px)?, 1fr\)/);
     ro.fire(420);
-    expect(tracksOf(grid)).toContain("repeat(2, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(2, minmax\(0(px)?, 1fr\)/);
     ro.fire(900);
-    expect(tracksOf(grid)).toContain("repeat(4, minmax(0, 1fr))");
+    expect(tracksOf(grid)).toMatch(/repeat\(4, minmax\(0(px)?, 1fr\)/);
     expect(tracksOf(grid)).toContain("align-items: start");
     expect(tracksOf(grid)).not.toContain("auto-fit");
   });
